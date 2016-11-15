@@ -119,7 +119,8 @@ public class BackgroundGenerator : MonoBehaviour {
 
         // Ground
         child = transform.GetChild(2);
-        child.localPosition = new Vector2(0, -height / 3);
+        //child.localPosition = new Vector2(0, -height / 3);-6.29'
+        child.localPosition = new Vector2(0, -6.3f);
         child.localScale = new Vector3(totalWidth + 10, 1);
 
         // Killzone

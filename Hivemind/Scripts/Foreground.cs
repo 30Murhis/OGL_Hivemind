@@ -22,7 +22,7 @@ public class Foreground : MonoBehaviour {
     
 	void Update () {
 
-        if (FindObjectOfType<Cameras>().lockedToTarget)
+        if (FindObjectOfType<CameraController>().lockedToTarget)
         {
 
             // Gets the distance between the character and the foreground door. xOffset = 0 if the door is in the center of the sprite.

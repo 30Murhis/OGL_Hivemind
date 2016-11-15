@@ -6,10 +6,17 @@
 public class CharacterInteraction : MonoBehaviour
 {
     //Reference to our diagUI script for quick access
-    public DialogueUI diagUI;
-    public float reachDistance = 2.5f;
+    [Tooltip("Reference to dialogueUI script.")]
+    public DialogueUI dialogueUI;
 
-    //CharacterMovement cm;
+    [Tooltip("Interaction perimeter radius.")]
+    public float perimeterRadius = 10f;
+
+    //public Material glowMaterial;
+
+    //// Because pivot is bottom center, this is added to transform.position to center the perimeter to character
+    //float perimeterCenterY = 3.5f;
+    
     RayMovement rm;
     RayPlayerInput rpi;
 
@@ -27,14 +34,14 @@ public class CharacterInteraction : MonoBehaviour
         //cm = GetComponent<CharacterMovement>();
         rpi = GetComponent<RayPlayerInput>();
         rm = GetComponent<RayMovement>();
-        diagUI = FindObjectOfType<DialogueUI>();
+        dialogueUI = FindObjectOfType<DialogueUI>();
     }
 
     void Update()
     {
 
         // If dialog is on, disable movement
-        if (diagUI.dialogue.isLoaded)
+        if (dialogueUI.dialogue.isLoaded)
         {
             //cm.AllowCharacterMovement(false);
             rm.allowMovement = false;
@@ -42,12 +49,12 @@ public class CharacterInteraction : MonoBehaviour
 
             if (Input.GetAxisRaw("Horizontal") != 0)
             {
-                diagUI.dialogue.EndDialogue();
+                dialogueUI.dialogue.EndDialogue();
             }
         }
 
         // Otherwise allow movement to characters involved in discussion
-        if (!diagUI.dialogue.isLoaded && discussionPartner)
+        if (!dialogueUI.dialogue.isLoaded && discussionPartner)
         {
             discussionPartner.GetComponent<RayNPC>().SetAIBehaviourActive(!isControlledNPC);
             discussionPartner.GetComponent<RayMovement>().allowMovement = true;
@@ -63,9 +70,26 @@ public class CharacterInteraction : MonoBehaviour
             TryInteract();
         }
 
-        Debug.DrawRay(new Vector2(transform.position.x, transform.position.y + 3), transform.right * reachDistance * rm.facingDirection, Color.red);
+        Debug.DrawRay(new Vector2(transform.position.x, transform.position.y + 3), transform.right * perimeterRadius * rm.facingDirection, Color.red);
+
+        //Collider2D[] colliders = Physics2D.OverlapCircleAll(transform.position + Vector3.up * perimeterCenterY, perimeterRadius);
+        //for (int i = 0; i < colliders.Length; i++)
+        //{
+        //    if (colliders[i].transform.parent == transform) continue;
+
+        //    // Checks for triggers & colliders
+        //    if (colliders[i].GetComponent<Trigger>() != null || colliders[i].tag == "NPC")
+        //    {
+        //        //colliders[i].GetComponentInChildren<SpriteRenderer>().material = glowMaterial;
+        //    }
+        //}
 
     }
+
+    //void OnDrawGizmosSelected()
+    //{
+    //    Gizmos.DrawWireSphere(transform.position + Vector3.up * perimeterCenterY, perimeterRadius);
+    //}
 
     /// <summary>
     /// Casts a ray to see if we hit an NPC and, if so, we interact
@@ -79,7 +103,7 @@ public class CharacterInteraction : MonoBehaviour
         }
 
         // Multi ray
-        RaycastHit2D[] rHit = Physics2D.RaycastAll(new Vector2(transform.position.x, transform.position.y + 3), Vector2.right * rm.facingDirection, reachDistance, -1);
+        RaycastHit2D[] rHit = Physics2D.RaycastAll(new Vector2(transform.position.x, transform.position.y + 3), Vector2.right * rm.facingDirection, perimeterRadius, -1);
         if (rHit.Length > 0)
         {
             foreach (RaycastHit2D hit in rHit)
@@ -98,6 +122,8 @@ public class CharacterInteraction : MonoBehaviour
                     {
                         discussionPartner = hit.collider.gameObject;
                     }
+
+                    if (!discussionPartner.GetComponent<VIDE_Assign>()) return;
 
                     discussionPartnerRM = discussionPartner.GetComponent<RayMovement>();
                     discussionPartnerRNPC = discussionPartner.GetComponent<RayNPC>();
@@ -121,17 +147,40 @@ public class CharacterInteraction : MonoBehaviour
         //Lets grab the NPC's DialogueAssign script...
         VIDE_Assign assigned = discussionPartner.GetComponent<VIDE_Assign>();
 
-        if (!diagUI.dialogue.isLoaded)
+        Sprite player = discussionPartner.GetComponent<Entity>().character.characterDialogSprite;
+        Sprite NPC = GetComponent<Entity>().character.characterDialogSprite;
+
+        if (!dialogueUI.dialogue.isLoaded)
         {
             //... and use it to begin the conversation
-            diagUI.Begin(assigned);
+            dialogueUI.Begin(assigned);
         }
         else
         {
             //If conversation already began, let's just progress through it
-            diagUI.NextNode();
+            dialogueUI.NextNode();
         }
-        diagUI.npcName.text = discussionPartner.name;
 
+        if (dialogueUI.dialogue.nodeData.currentIsPlayer)
+        {
+            dialogueUI.dialogImage.sprite = NPC;
+            dialogueUI.dialogImage.transform.SetAsFirstSibling();
+            dialogueUI.dialogImage.rectTransform.localScale = Vector3.one;
+        }
+        else
+        {
+            dialogueUI.dialogImage.sprite = player;
+            dialogueUI.dialogImage.transform.SetAsLastSibling();
+            dialogueUI.dialogImage.rectTransform.localScale = new Vector3(-1, 1, 1);
+        }
+        
+
+        dialogueUI.npcName.text = discussionPartner.name;
+    }
+
+    void OnDestroy()
+    {
+        if (dialogueUI && dialogueUI.dialogue)
+            dialogueUI.dialogue.EndDialogue();
     }
 }

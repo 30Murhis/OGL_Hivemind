@@ -232,6 +232,7 @@ public class VIDE_Data : MonoBehaviour
     public NodeData BeginDialogue(VIDE_Assign diagToLoad)
     {
         //First we load the dialogue we requested
+        //if (diagToLoad.diags.Count < 1) diagToLoad.loadFiles();
         if (Load(diagToLoad.diags[diagToLoad.assignedIndex]))
         {
             isLoaded = true;
@@ -301,7 +302,7 @@ public class VIDE_Data : MonoBehaviour
     public void EndDialogue()
     {
         nodeData = null;
-        assigned.interactionCount++;
+        if(assigned) assigned.interactionCount++;
         assigned = null;
         playerDiags = new List<CommentSet>(); ;
         npcDiags = new List<Answer>(); ;

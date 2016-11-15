@@ -68,9 +68,9 @@ public class CharacterInteraction_OLD : MonoBehaviour
                     if (hit.collider.name.StartsWith("Ghost"))
                     {
                         // Get the ghost's original from the character pair list
-                        CharacterPair cp = FindObjectOfType<GhostManager>().characters.Find(c => c.Ghost == hit.collider.gameObject);
-                        discussionPartner = cp.Original.GetComponent<NPC>();
-                        discussionPartner.TurnTowards(transform, true);
+                        //CharacterPair cp = FindObjectOfType<GhostManager>().characters.Find(c => c.Ghost == hit.collider.gameObject);
+                        //discussionPartner = cp.Original.GetComponent<NPC>();
+                        //discussionPartner.TurnTowards(transform, true);
                     }
                     else
                     {

@@ -68,7 +68,7 @@ public class Hivemind : MonoBehaviour {
             Camera.main.GetComponent<BorderStopCamera>().target = currentCharacter.transform;
             */
 
-        if (Camera.main.transform.parent.GetComponent<Cameras>())
+        if (Camera.main.transform.parent.GetComponent<CameraController>())
         {
             //Camera.main.transform.parent.GetComponent<Cameras>().target = currentCharacter.transform;
         }

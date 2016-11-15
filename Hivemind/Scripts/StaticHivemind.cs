@@ -11,7 +11,7 @@ public class StaticHivemind : MonoBehaviour
     protected static int currentCharacterI = 0;
 
     protected static List<InfectedCharacters> hivemind = new List<InfectedCharacters>();
-    Cameras cameraManager;
+    CameraController cameraManager;
 
     static void SwitchCharacter()
     {

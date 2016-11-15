@@ -10,6 +10,11 @@ public class RayNPC : MonoBehaviour {
 
     public bool enableStateLogging = false;
 
+	// initialize the AI eyesight
+	public float sightRange = 5f;
+	public Transform SightStart, SightEnd;
+
+
     enum State
     {
         Infected,
@@ -19,7 +24,7 @@ public class RayNPC : MonoBehaviour {
         Chasing
     }
 
-    RandomComment comment;
+    public RandomComment comment;
     RayMovement rayMovement;
     State currentState = State.Idle;
     
@@ -34,7 +39,7 @@ public class RayNPC : MonoBehaviour {
 
     void Start()
     {
-        comment = GetComponentInChildren<RandomComment>();
+        if (comment == null) comment = GetComponentInChildren<RandomComment>(true);
         comment.transform.parent.gameObject.SetActive(false);
     }
 
@@ -62,9 +67,9 @@ public class RayNPC : MonoBehaviour {
             if (Random.value < .002f)
                 SwitchState();
 
-            if (Random.value < .003f)
+            if (Random.value < .002f)
             {
-                if (comment == null) comment = GetComponentInChildren<RandomComment>();
+                if (comment == null) comment = GetComponentInChildren<RandomComment>(true);
                 comment.NewRandomComment();
             }
             
@@ -88,6 +93,8 @@ public class RayNPC : MonoBehaviour {
                     break;
             }
         }
+
+		Sight();
     }
 
     void StateRandomization()
@@ -188,4 +195,18 @@ public class RayNPC : MonoBehaviour {
                 transform.localScale = new Vector3(ls.x * -1, ls.y, ls.z);
         }
     }
+
+	void Sight(){
+
+
+
+		SightEnd.position = new Vector2(SightStart.position.x + sightRange * moveDirection, SightStart.position.y);
+
+		Debug.DrawLine (SightStart.position, SightEnd.position , Color.blue);
+		if (Physics2D.Linecast (SightStart.position, SightEnd.position,1 << LayerMask.NameToLayer("Player"))) {
+			print ("detected !");
+		}
+
+	}
 }
+

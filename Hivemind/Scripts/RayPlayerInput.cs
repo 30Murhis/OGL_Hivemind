@@ -18,8 +18,11 @@ public class RayPlayerInput : MonoBehaviour {
     GameObject triggerIndicator;
     GameObject ui;
 
+    CameraController cameras;
     RayMovement rayMovement;
     CharacterInteraction characterInteraction;
+
+    float facingDirection = 1;
 
     // Use this for initialization
     void Start () {
@@ -31,14 +34,26 @@ public class RayPlayerInput : MonoBehaviour {
 
         ui = GameObject.FindGameObjectWithTag("UI");
         triggerIndicator = ui.transform.FindChild("TriggerIndicator").gameObject;
+
+        cameras = FindObjectOfType<CameraController>();
     }
 	
 	void Update ()
     {
         // Interaction with NPC's (hard coded key for now)
-        characterInteraction.TryInteraction = Input.GetKeyDown(KeyCode.E);
+        //characterInteraction.TryInteraction = Input.GetKeyDown(KeyCode.E);
+
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            transform.GetComponentInChildren<InteractionPerimeter>().InteractWithCurrentTarget();
+        }
 
         if (!enablePlayerInput) return;
+
+        if (Input.GetKeyDown(KeyCode.Q))
+        {
+            transform.GetComponentInChildren<InteractionPerimeter>().TryGetNextInteractionTarget();
+        }
 
         // Shooting
         if (Input.GetButtonDown("Fire1"))
@@ -49,16 +64,38 @@ public class RayPlayerInput : MonoBehaviour {
         // Horizontal & vertical movement
         rayMovement.CharacterInput = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
 
+        if (rayMovement.CharacterInput != Vector2.zero)
+            facingDirection = Mathf.Sign(rayMovement.CharacterInput.x);
+
         // Jumping (hard coded key for now)
         rayMovement.Jump = Input.GetKeyDown(KeyCode.Space); // GetKey() enables bunny hopping
 
         // Running (hard coded key for now)
         rayMovement.Run = Input.GetKey(KeyCode.LeftShift);
 
+        if (rayMovement.CharacterInput != Vector2.zero)
+        {
+            // If running, sets camera's x offset
+            if (rayMovement.Run) cameras.SetRunXOffset((int)rayMovement.CharacterInput.x);
+
+            // If run is pressed down, activates run camera
+            if (Input.GetKeyDown(KeyCode.LeftShift))
+            {
+                cameras.ActivateRunCamera(true);
+            }
+        }
+
+        // If run button is released, deactivates run camera and x offset
+        if (Input.GetKeyUp(KeyCode.LeftShift))
+        {
+            cameras.ActivateRunCamera(false);
+            cameras.offsetX = 0;
+        }
+
         // Trigger activation (hard coded key for now)
         if (Input.GetKeyDown(KeyCode.F) && inTrigger != null)
         {
-            if (inTrigger.GetComponent<DoorTrigger>().smoothTransition)
+            if (inTrigger.GetComponent<DoorTrigger>() && inTrigger.GetComponent<DoorTrigger>().smoothTransition)
             {
                 enablePlayerInput = false;
                 //StartCoroutine(rayMovement.WalkToPreviousLevel(inTrigger, 2));
@@ -66,7 +103,15 @@ public class RayPlayerInput : MonoBehaviour {
                 //StartCoroutine(SmoothLevelTransition());
                 inTrigger.GetComponent<Trigger>().Activate();
             }
+            if (inTrigger.GetComponent<ElevatorTrigger>())
+                inTrigger.GetComponent<ElevatorTrigger>().requirementMet = transform.name.Contains(inTrigger.GetComponent<ElevatorTrigger>().requiredAuthorization) ? true : false;
+
             inTrigger.GetComponent<Trigger>().Activate();
+        }
+
+        if (Input.GetKeyDown(KeyCode.Tab))
+        {
+            CharacterManager.ChangeCurrentCharacter();
         }
 
         // Up (climb, go up in levels) (hard coded key for now)
@@ -88,17 +133,20 @@ public class RayPlayerInput : MonoBehaviour {
     void Shoot()
     {
         // Gets mouse position from screen
-        Vector2 target = Camera.main.ScreenToWorldPoint(new Vector2(Input.mousePosition.x, Input.mousePosition.y));
-        Vector2 myPos = new Vector2(sporeShotSource.transform.position.x, sporeShotSource.transform.position.y);
+        //Vector2 target = Camera.main.ScreenToWorldPoint(new Vector2(Input.mousePosition.x, Input.mousePosition.y));
+        //Vector2 myPos = new Vector2(sporeShotSource.transform.position.x, sporeShotSource.transform.position.y);
+        //Debug.Log("Facing " + facingDirection);
 
         // Creates the projectile
-        shot = (GameObject)Instantiate(projectile, sporeShotSource.transform.position, Quaternion.identity);
+
+        if (shot == null)
+            shot = (GameObject)Instantiate(projectile, sporeShotSource.transform.position, Quaternion.Euler(new Vector3(0, facingDirection > 0 ? 0 : 180, 0)));
 
         // Uses object pool to spawn a projectile
         //shot = ObjectPool.current.Spawn(projectile, sporeShotSource.transform.position, Quaternion.identity);
 
         //  Sets projectile's direction towards the mouse position
-        shot.GetComponent<SporeShot>().SetDirection(target - myPos);
+        //shot.GetComponent<SporeShot>().SetDirection(target - myPos);
     }
 
     void OnTriggerExit2D(Collider2D col)

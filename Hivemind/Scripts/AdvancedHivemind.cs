@@ -16,7 +16,7 @@ public class InfectedCharacter
 
 public class AdvancedHivemind : MonoBehaviour
 {
-    public List<GameObject> characters;
+
     public GameObject ui;
 
     GameObject currentCharacter;
@@ -24,12 +24,12 @@ public class AdvancedHivemind : MonoBehaviour
     float scroll = 0;
 
     public List<InfectedCharacter> hivemind = new List<InfectedCharacter>();
-    Cameras cameraManager;
+    //Cameras cameraManager;
     DialogueUI diagUI;
 
     // Singleton
     static AdvancedHivemind instance;
-    
+
     public static AdvancedHivemind GetInstance()
     {
         return instance;
@@ -37,6 +37,10 @@ public class AdvancedHivemind : MonoBehaviour
 
     void Start()
     {
+        // Finds stuff
+        if (ui == null) ui = GameObject.FindGameObjectWithTag("UI");
+        if (diagUI == null) diagUI = FindObjectOfType<DialogueUI>();
+
         // Checking for existing singleton
         if (instance != null)
         {
@@ -56,8 +60,12 @@ public class AdvancedHivemind : MonoBehaviour
 #endif
         }
 
+        if (hivemind.Count <= 0) return;
+
         // Sets the currently active character
         currentCharacter = hivemind[currentCharacterIndex].Character;
+        //currentCharacter.AddComponent<InfectionTimer>().BeginTimer();
+        DisableOthers();
 
         // Disable input for every character except the first one
         for (int i = 0; i < hivemind.Count; i++)
@@ -66,17 +74,26 @@ public class AdvancedHivemind : MonoBehaviour
         }
 
         // Gets the camera manager
-        cameraManager = Camera.main.transform.parent.gameObject.GetComponent<Cameras>();
-        cameraManager.target = currentCharacter.transform;
-
-        // Finds stuff
-        if (ui == null) ui = GameObject.FindGameObjectWithTag("UI");
-        if (diagUI == null) diagUI = FindObjectOfType<DialogueUI>();
+        //cameraManager = Camera.main.transform.parent.gameObject.GetComponent<Cameras>();
+        //cameraManager.target = currentCharacter.transform;
     }
 
     void Update()
     {
-        // Mouse scrollwheel (changes character), no console key yet
+        // Tab for changing character
+        if (Input.GetKeyDown(KeyCode.Tab) && !diagUI.dialogue.isLoaded)
+        {
+            if (hivemind.Count < 2) return;
+
+            if (currentCharacterIndex < hivemind.Count - 1) currentCharacterIndex++;
+            else currentCharacterIndex = 0;
+
+            SwitchCharacter();
+            FindObjectOfType<DebugDisplay>().SetText("Currently controlling\n" + currentCharacter.name);
+        }
+
+        /*
+        // Mouse scrollwheel for changing character, OLD 
         scroll = Input.GetAxis("Mouse ScrollWheel");
         if (scroll != 0 && !diagUI.dialogue.isLoaded)
         {
@@ -94,18 +111,32 @@ public class AdvancedHivemind : MonoBehaviour
                 if (currentCharacterIndex > 0) currentCharacterIndex--;
                 else currentCharacterIndex = hivemind.Count - 1;
             }
-            
+
             SwitchCharacter();
             FindObjectOfType<DebugDisplay>().SetText("Currently controlling\n" + currentCharacter.name);
         }
+        */
+    }
 
-        if (Input.GetKeyDown(KeyCode.G))
+
+    void DisableOthers()
+    {
+        for (int i = 0; i < hivemind.Count; i++)
         {
-            RemoveCharacter(currentCharacter);
+            if (i != currentCharacterIndex)
+            {
+                hivemind[i].Character.GetComponent<RayMovement>().Run = false;
+                hivemind[i].Character.GetComponent<RayMovement>().CharacterInput = Vector2.zero;
+                hivemind[i].Character.GetComponent<RayPlayerInput>().enabled = false;
+                hivemind[i].Character.GetComponent<CharacterInteraction>().enabled = false;
+            }
         }
     }
 
+
+
     public void SwitchCharacter()
+
     {
         /*
         currentCharacter.GetComponent<CharacterMovement>().Move(0, false, false, false);
@@ -116,23 +147,32 @@ public class AdvancedHivemind : MonoBehaviour
         */
 
         // Stop the previous character and disable input scripts
+        /*
         if (currentCharacter != null)
         {
             currentCharacter.GetComponent<RayMovement>().Run = false;
             currentCharacter.GetComponent<RayMovement>().CharacterInput = Vector2.zero;
             currentCharacter.GetComponent<RayPlayerInput>().enabled = false;
             currentCharacter.GetComponent<CharacterInteraction>().enabled = false;
-        }
+        }*/
+
+
+        // Get new character and enable its input scripts and disable others' scripts
 
         // Get new character and enable its input scripts
-		currentCharacter.GetComponent<StartInfectionTimer>().enabled = true;
+        //currentCharacter.GetComponent<InfectionTimer>().enabled = true; // refs/remotes/origin/master
         currentCharacter = hivemind[currentCharacterIndex].Character;
+
+        DisableOthers();
+
         currentCharacter.GetComponent<RayPlayerInput>().enabled = true;
         currentCharacter.GetComponent<CharacterInteraction>().enabled = true;
+        if (currentCharacter.GetComponentInChildren<RandomComment>())
+            currentCharacter.GetComponentInChildren<RandomComment>().transform.parent.gameObject.SetActive(false);
 
         ui.transform.FindChild("TriggerIndicator").gameObject.SetActive(false);
-        
-        cameraManager.ChangeTargetSmooth(currentCharacter);
+
+        //cameraManager.ChangeTarget(currentCharacter);
     }
 
     /// <summary>
@@ -141,14 +181,19 @@ public class AdvancedHivemind : MonoBehaviour
     /// <param name="character"></param>
     public void AddCharacter(GameObject character)
     {
-#if UNITY_5_3_OR_NEWER
-        hivemind.Add(new InfectedCharacter() { Character = character, Floor = SceneManager.GetActiveScene().buildIndex, InPlayerControl = false, Life = 100 });
-#else
-        hivemind.Add(new InfectedCharacter() { Character = character, Floor = Application.loadedLevel, InPlayerControl = false, Life = 100 });
-#endif
-        character.transform.parent = gameObject.transform;
-        character.GetComponent<RayPlayerInput>().enabled = false;
-        character.GetComponent<RayNPC>().enabled = false;
+//#if UNITY_5_3_OR_NEWER
+//        hivemind.Add(new InfectedCharacter() { Character = character, Floor = SceneManager.GetActiveScene().buildIndex, InPlayerControl = false, Life = 100 });
+//#else
+//        hivemind.Add(new InfectedCharacter() { Character = character, Floor = Application.loadedLevel, InPlayerControl = false, Life = 100 });
+//#endif
+//        character.transform.parent = gameObject.transform;
+//        character.GetComponent<RayPlayerInput>().enabled = false;
+//        character.GetComponent<RayNPC>().enabled = false;
+//        if (character.GetComponentInChildren<RandomComment>())
+//            character.GetComponentInChildren<RandomComment>().transform.parent.gameObject.SetActive(false);
+        //character.AddComponent<InfectionTimer>().BeginTimer();
+
+        CharacterManager.InfectCharacter(character);
     }
 
     /// <summary>
@@ -156,10 +201,10 @@ public class AdvancedHivemind : MonoBehaviour
     /// </summary>
     /// <param name="character"></param>
 	/// 
-	public void CallThisInfection ()
-	{
-		RemoveCharacter(currentCharacter);
-	}
+	public void CallThisInfection()
+    {
+        RemoveCharacter(currentCharacter);
+    }
     public void RemoveCharacter(GameObject character)
     {
         hivemind.RemoveAll(i => i.Character == character);
@@ -172,11 +217,16 @@ public class AdvancedHivemind : MonoBehaviour
         Destroy(character);
     }
 
+    public GameObject GetCurrentlyActiveCharacter()
+    {
+        return currentCharacter;
+    }
+
     void FindNextAvailableCharacter()
     {
         if (hivemind.Count < 1)
         {
-			StartCoroutine (GameOver ());
+            StartCoroutine(GameOver());
             return;
         }
         else if (hivemind.Count == 1)
@@ -199,15 +249,20 @@ public class AdvancedHivemind : MonoBehaviour
 
     IEnumerator GameOver()
     {
+        //FindObjectOfType<CameraController>().transform.SetParent(null);
         Debug.Log("GAME OVER. HIVEMIND IS DEAD.");
-		FindObjectOfType<DebugDisplay>().SetText("Out of hosts. You are dead!");
-		yield return new WaitForSeconds (5);
+        FindObjectOfType<DebugDisplay>().SetText("Out of hosts. You are dead!");
+        yield return new WaitForSeconds(5);
         Destroy(gameObject);
     }
 
     void OnDestroy()
     {
-		Application.LoadLevel (0);
+        //if (instance = this)
+        //SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+
+        //Application.LoadLevel(2);
+
     }
 
 }

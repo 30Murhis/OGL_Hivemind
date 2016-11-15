@@ -75,7 +75,7 @@ public class VIDE_Assign : MonoBehaviour
         return true;
     }
 
-    private void loadFiles()
+    public void loadFiles()
     {
         TextAsset[] files = Resources.LoadAll<TextAsset>("Dialogues");
         diags = new List<string>();
