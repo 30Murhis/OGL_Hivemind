@@ -45,14 +45,16 @@ public class RayPlayerInput : MonoBehaviour {
 
         if (Input.GetKeyDown(KeyCode.E))
         {
-            transform.GetComponentInChildren<InteractionPerimeter>().InteractWithCurrentTarget();
+            if (transform.GetComponentInChildren<InteractionPerimeter>())
+                transform.GetComponentInChildren<InteractionPerimeter>().InteractWithCurrentTarget();
         }
 
         if (!enablePlayerInput) return;
 
         if (Input.GetKeyDown(KeyCode.Q))
         {
-            transform.GetComponentInChildren<InteractionPerimeter>().TryGetNextInteractionTarget();
+            if (transform.GetComponentInChildren<InteractionPerimeter>())
+                transform.GetComponentInChildren<InteractionPerimeter>().TryGetNextInteractionTarget();
         }
 
         // Shooting

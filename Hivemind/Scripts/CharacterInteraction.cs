@@ -147,8 +147,8 @@ public class CharacterInteraction : MonoBehaviour
         //Lets grab the NPC's DialogueAssign script...
         VIDE_Assign assigned = discussionPartner.GetComponent<VIDE_Assign>();
 
-        Sprite player = discussionPartner.GetComponent<Entity>().character.characterDialogSprite;
-        Sprite NPC = GetComponent<Entity>().character.characterDialogSprite;
+        Sprite player = discussionPartner.GetComponent<Entity>().entityData.character.characterDialogSprite;
+        Sprite NPC = GetComponent<Entity>().entityData.character.characterDialogSprite;
 
         if (!dialogueUI.dialogue.isLoaded)
         {

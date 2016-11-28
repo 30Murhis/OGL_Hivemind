@@ -33,8 +33,21 @@ public class CameraController : MonoBehaviour {
 
     IEnumerator zoomCoroutine;
 
+    public static CameraController Instance;
+
     void Start()
     {
+        if (Instance == null)
+        {
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+        else
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         // If main camera not set, gets it
         if (!mainCamera) mainCamera = Camera.main.transform;
 
@@ -44,12 +57,7 @@ public class CameraController : MonoBehaviour {
         // If background object not set, finds one
         if (background == null) background = FindObjectOfType<BackgroundGenerator>().gameObject;
 
-        // Setting the support camera distance from the main camera based on background's width.
-        for (int i = 0; i < background.transform.childCount; i++)
-        {
-            if (background.transform.GetChild(i).name.Contains("Background"))
-                width += background.transform.GetChild(i).GetComponent<SpriteRenderer>().bounds.size.x;
-        }
+        SetSupportCameraDistance();
 
         // Setting the main camera to center and the support camera to the side
         mainCamera.localPosition = new Vector3(0, mainCamera.localPosition.y, offsetZ);
@@ -63,6 +71,16 @@ public class CameraController : MonoBehaviour {
         CharacterManager.OnCharacterChange += CharacterManager_OnCharacterChange;
     }
 
+    void SetSupportCameraDistance()
+    {
+        // Setting the support camera distance from the main camera based on background's width.
+        for (int i = 0; i < background.transform.childCount; i++)
+        {
+            if (background.transform.GetChild(i).name.Contains("Background"))
+                width += background.transform.GetChild(i).GetComponent<SpriteRenderer>().bounds.size.x;
+        }
+    }
+
     /// <summary>
     /// Method to call when character gets changed in character manager.
     /// </summary>
@@ -73,6 +91,12 @@ public class CameraController : MonoBehaviour {
 
     void LateUpdate()
     {
+        if (background == null)
+        {
+            background = FindObjectOfType<BackgroundGenerator>().gameObject;
+            SetSupportCameraDistance();
+        }
+
         // If target is not found/set
         if (!target)
         {

@@ -11,6 +11,8 @@ public class BorderColliderMap : MonoBehaviour
     
     void OnTriggerExit2D(Collider2D col)
     {
+        if (col.tag != "Player" && col.tag != "NPC") return;
+
         float difference = col.transform.position.x - transform.position.x;
 
         // Move the object to the other border

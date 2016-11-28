@@ -1,6 +1,9 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 
+/// <summary>
+/// Character scriptable object class containing unchangeable initialization data used to construct all characters.
+/// </summary>
 [System.Serializable]
 public class Character : ScriptableObject
 {
@@ -9,9 +12,6 @@ public class Character : ScriptableObject
 
     [Tooltip("Original spawn level of this character.")]
     public int spawnFloor = 0;
-
-    //[Tooltip("The level this character currently is located.")]
-    //public int currentFloor = 0;
 
     [Tooltip("Authorization state/access rights.")]
     public string authorization = "";
@@ -22,14 +22,8 @@ public class Character : ScriptableObject
     [Tooltip("The duration of each infection stage before stage advances to the next level.")]
     public int infectionStageDuration = 15;
 
-    //[Tooltip("Current duration of the current infection stage. Used to keep track of time between level changes.")]
-    //public int currentInfectionStageDuration = 0;
-
     [Tooltip("Animator of the character.")]
     public RuntimeAnimatorController animator = null;
-
-    //[Tooltip("Is this character alive.")]
-    //public bool isAlive = true;
 
     [Tooltip("Is this character a non-playable character at the start.")]
     public bool isOriginallyNPC = true;
@@ -49,12 +43,6 @@ public class Character : ScriptableObject
     [Tooltip("Gender of the character.")]
     public CharacterEnums.Gender gender = CharacterEnums.Gender.Unknown;
 
-    //[Tooltip("Current state of infection on this character.")]
-    //public InfectionState currentStateOfInfection = InfectionState.None;
-
-    //[Tooltip("Current state of suspicion of this character.")]
-    //public SuspicionState currentStateOfSuspicion = SuspicionState.None;
-
     [Tooltip("VIDE conversation that this character uses.")]
     public string VideConversation = null;
 
@@ -68,21 +56,6 @@ public class Character : ScriptableObject
     public Sprite characterDialogSprite = null;
 
     //public List<CommentList> comments = null; // or List<string>
-
-    //public enum InfectionState
-    //{
-    //    None, State1, State2, State3, State4, State5
-    //}
-
-    //public enum SuspicionState
-    //{
-    //    None, Concern, Suspicion, Awareness, Fear, Panic, Alert, Intervention
-    //}
-
-    //public int GetFinalInfectionState()
-    //{
-    //    return (int)InfectionState.State5;
-    //}
 }
 
 public class CharacterEnums
@@ -97,11 +70,11 @@ public class CharacterEnums
     }
 
     /// <summary>
-    /// Infection state of the character.
+    /// Infection stage of the character.
     /// </summary>
-    public enum InfectionState
+    public enum InfectionStage
     {
-        None, State1, State2, State3, State4, Final
+        None, Stage1, Stage2, Stage3, Stage4, Final
     }
 
     /// <summary>

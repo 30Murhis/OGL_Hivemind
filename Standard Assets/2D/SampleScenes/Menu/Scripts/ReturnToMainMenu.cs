@@ -1,10 +1,20 @@
 using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class ReturnToMainMenu : MonoBehaviour
 {
     private bool m_Levelloaded;
 
+    void Awake()
+    {
+        SceneManager.activeSceneChanged += LevelLoaded;
+    }
+
+    void LevelLoaded(Scene arg0, Scene arg1)
+    {
+        m_Levelloaded = true;
+    }
 
     public void Start()
     {
@@ -12,10 +22,10 @@ public class ReturnToMainMenu : MonoBehaviour
     }
 
 
-    private void OnLevelWasLoaded(int level)
-    {
-        m_Levelloaded = true;
-    }
+    //private void OnLevelWasLoaded(int level)
+    //{
+    //    m_Levelloaded = true;
+    //}
 
 
     private void Update()
