@@ -4,6 +4,8 @@ using UnityEditor;
 [CustomEditor(typeof(DebugInput))]
 public class DebugInputEditor : Editor
 {
+    int defaultFieldWidth = 20;
+
     public override void OnInspectorGUI()
     {
         DrawDefaultInspector();
@@ -23,46 +25,55 @@ public class DebugInputEditor : Editor
 
         EditorGUILayout.Space();
 
+        EditorGUILayout.LabelField("Settings", EditorStyles.boldLabel);
+
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("Enable Mouse Wheel Camera Zoom");
+        myTarget.allowCameraZoom = EditorGUILayout.Toggle(myTarget.allowCameraZoom, GUILayout.Width(defaultFieldWidth));
+        EditorGUILayout.EndHorizontal();
+
+        EditorGUILayout.Space();
+
         EditorGUILayout.LabelField("Key Bindings", EditorStyles.boldLabel);
 
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Kill Current Character");
-        myTarget.keyKillCurrentCharacter = EditorGUILayout.TextField(myTarget.keyKillCurrentCharacter, GUILayout.Width(30));
+        myTarget.keyKillCurrentCharacter = EditorGUILayout.TextField(myTarget.keyKillCurrentCharacter, GUILayout.Width(defaultFieldWidth));
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Warp Target To Current");
-        myTarget.keyWarpTargetToCurrent = EditorGUILayout.TextField(myTarget.keyWarpTargetToCurrent, GUILayout.Width(30));
+        myTarget.keyWarpTargetToCurrent = EditorGUILayout.TextField(myTarget.keyWarpTargetToCurrent, GUILayout.Width(defaultFieldWidth));
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Display Comment On Target");
-        myTarget.keyChangeCommentOfTargetChar = EditorGUILayout.TextField(myTarget.keyChangeCommentOfTargetChar, GUILayout.Width(30));
+        myTarget.keyChangeCommentOfTargetChar = EditorGUILayout.TextField(myTarget.keyChangeCommentOfTargetChar, GUILayout.Width(defaultFieldWidth));
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Move Target Left");
-        myTarget.keyMoveTargetCharLeft = EditorGUILayout.TextField(myTarget.keyMoveTargetCharLeft, GUILayout.Width(30));
+        myTarget.keyMoveTargetCharLeft = EditorGUILayout.TextField(myTarget.keyMoveTargetCharLeft, GUILayout.Width(defaultFieldWidth));
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Move Target Right");
-        myTarget.keyMoveTargetCharRight = EditorGUILayout.TextField(myTarget.keyMoveTargetCharRight, GUILayout.Width(30));
+        myTarget.keyMoveTargetCharRight = EditorGUILayout.TextField(myTarget.keyMoveTargetCharRight, GUILayout.Width(defaultFieldWidth));
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Run With Target");
-        myTarget.keyRunWithTargetChar = EditorGUILayout.TextField(myTarget.keyRunWithTargetChar, GUILayout.Width(30));
+        myTarget.keyRunWithTargetChar = EditorGUILayout.TextField(myTarget.keyRunWithTargetChar, GUILayout.Width(defaultFieldWidth));
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Spawn Random Character");
-        myTarget.keySpawnRandomCharacter = EditorGUILayout.TextField(myTarget.keySpawnRandomCharacter, GUILayout.Width(30));
+        myTarget.keySpawnRandomCharacter = EditorGUILayout.TextField(myTarget.keySpawnRandomCharacter, GUILayout.Width(defaultFieldWidth));
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Spawn Random Character Randomly");
-        myTarget.keySpawnRandomCharacterSomewhere = EditorGUILayout.TextField(myTarget.keySpawnRandomCharacterSomewhere, GUILayout.Width(30));
+        myTarget.keySpawnRandomCharacterSomewhere = EditorGUILayout.TextField(myTarget.keySpawnRandomCharacterSomewhere, GUILayout.Width(defaultFieldWidth));
         EditorGUILayout.EndHorizontal();
 
         /* Buttons

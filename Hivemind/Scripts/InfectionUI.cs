@@ -20,17 +20,18 @@ public class InfectionUI : MonoBehaviour {
         Destroy(transform.GetChild(i).gameObject);
     }
 
-    void CharacterManager_OnNewInfectedCharacter(Entity e)
+    void CharacterManager_OnNewInfectedCharacter(EntityData ed)
     {
-        SpawnInfectionDisplayer(e);
+        SpawnInfectionDisplayer(ed);
     }
 
-    void SpawnInfectionDisplayer(Entity e)
+    void SpawnInfectionDisplayer(EntityData ed)
     {
         GameObject go = (GameObject)Instantiate(UIPanelPrefab, transform, false);
-        go.transform.FindChild("Character").GetComponent<Text>().text = e.character.characterName;
-        go.transform.FindChild("InfectionStage").GetComponent<Text>().text = e.currentStateOfInfection.ToString();
-        go.GetComponent<Image>().fillAmount = (((float)e.character.infectionStageDuration - (float)e.currentInfectionStageDuration) / (float)e.character.infectionStageDuration);
+        go.transform.FindChild("Character").GetComponent<Text>().text = ed.character.characterName;
+        go.transform.FindChild("InfectionStage").GetComponent<Text>().text = ed.currentStateOfInfection.ToString();
+        //go.GetComponent<Image>().sprite = e.character.characterDialogSprite; //faceSprite?
+        go.GetComponent<Image>().fillAmount = (((float)ed.character.infectionStageDuration - (float)ed.currentInfectionStageDuration) / (float)ed.character.infectionStageDuration);
     }
 
     void CharacterManager_OnInfectionAdvance()
@@ -42,9 +43,9 @@ public class InfectionUI : MonoBehaviour {
                 SpawnInfectionDisplayer(CharacterManager.instance.infectedCharacters[i]);
             }
 
-            Entity e = CharacterManager.instance.infectedCharacters[i];
-            transform.GetChild(i).FindChild("InfectionStage").GetComponent<Text>().text = e.currentStateOfInfection.ToString();
-            transform.GetChild(i).GetComponent<Image>().fillAmount = (((float)e.character.infectionStageDuration - (float)e.currentInfectionStageDuration) / (float)e.character.infectionStageDuration);
+            EntityData ed = CharacterManager.instance.infectedCharacters[i];
+            transform.GetChild(i).FindChild("InfectionStage").GetComponent<Text>().text = ed.currentStateOfInfection.ToString();
+            transform.GetChild(i).GetComponent<Image>().fillAmount = (((float)ed.character.infectionStageDuration - (float)ed.currentInfectionStageDuration) / (float)ed.character.infectionStageDuration);
         }
     }
 }

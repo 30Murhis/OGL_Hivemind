@@ -1,5 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine.SceneManagement;
+using System;
 
 [RequireComponent(typeof(CircleCollider2D))]
 public class InteractionPerimeter : MonoBehaviour
@@ -30,8 +32,31 @@ public class InteractionPerimeter : MonoBehaviour
 
     // Discussion partner used in dialogues
     GameObject discussionPartner;
-    
+
+    // Static instance to keep only one existing at the same time
+    public static InteractionPerimeter Instance;
+
+    void Awake()
+    {
+        SceneManager.activeSceneChanged += LevelLoaded;
+    }
+
+    void LevelLoaded(Scene arg0, Scene arg1)
+    {
+        interactables.Clear();
+    }
+
     void Start () {
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         CircleCollider2D cc = GetComponent<CircleCollider2D>();
         cc.radius = perimeterRadius;
         cc.offset = Vector2.up * perimeterCenterY;
@@ -49,6 +74,7 @@ public class InteractionPerimeter : MonoBehaviour
     void CharacterManager_OnCharacterDeath(int i)
     {
         transform.SetParent(null);
+        TryFindNewParent();
     }
 
     /// <summary>
@@ -60,6 +86,13 @@ public class InteractionPerimeter : MonoBehaviour
     }
     
     void Update () {
+        if (dialogueUI == null)
+        {
+            dialogueUI = FindObjectOfType<DialogueUI>();
+        }
+
+        if (dialogueUI == null) return;
+
         if (!dialogueUI.dialogue.isLoaded && discussionPartner)
         {
             SetDialogueModeActive(false);
@@ -202,14 +235,14 @@ public class InteractionPerimeter : MonoBehaviour
         if (obj.tag == "NPC") // && obj.GetComponent<RayNPC>()
         {
             if (obj.name.StartsWith("Ghost")) {
-                if (obj.GetComponentInParent<Entity>().character.isInteractable)
+                if (obj.GetComponentInParent<Entity>().entityData.character.isInteractable)
                 {
                     discussionPartner = obj.transform.parent.gameObject;
                 }
             }
             else
             {
-                if (obj.GetComponent<Entity>().character.isInteractable)
+                if (obj.GetComponent<Entity>().entityData.character.isInteractable)
                 {
                     discussionPartner = obj;
                 }
@@ -263,8 +296,8 @@ public class InteractionPerimeter : MonoBehaviour
     {
         VIDE_Assign assigned = discussionPartner.GetComponent<VIDE_Assign>();
 
-        Sprite NPC = discussionPartner.GetComponent<Entity>().character.characterDialogSprite;
-        Sprite player = CharacterManager.GetCurrentCharacterEntity().character.characterDialogSprite;
+        Sprite NPC = discussionPartner.GetComponent<Entity>().entityData.character.characterDialogSprite;
+        Sprite player = CharacterManager.GetCurrentCharacterEntity().entityData.character.characterDialogSprite;
 
         if (!dialogueUI.dialogue.isLoaded)
         {

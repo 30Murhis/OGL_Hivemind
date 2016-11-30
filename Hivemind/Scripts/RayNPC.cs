@@ -157,7 +157,8 @@ public class RayNPC : MonoBehaviour {
         tag = "Player";
         name = "Infected " + gameObject.name;
         rayMovement.CharacterInput = Vector2.zero;
-        FindObjectOfType<AdvancedHivemind>().AddCharacter(this.gameObject);
+        //FindObjectOfType<AdvancedHivemind>().AddCharacter(this.gameObject);
+        CharacterManager.InfectCharacter(gameObject);
     }
 
     /// <summary>

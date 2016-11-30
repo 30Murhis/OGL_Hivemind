@@ -8,6 +8,8 @@ using UnityEngine.SceneManagement;
 public class DoorTrigger : MonoBehaviour, Trigger {
 
     public int loadLevel = 0;
+    public bool useLevelNamePrefixes = false;
+    //public string loadLevelName = "LevelName";
     public bool smoothTransition = true;
 
     AsyncOperation async;
@@ -99,12 +101,19 @@ public class DoorTrigger : MonoBehaviour, Trigger {
     /// </summary>
     public void Activate()
     {
-        string name = GetLevelNamePrefix() + loadLevel;
+        if (useLevelNamePrefixes)
+        {
+            string name = GetLevelNamePrefix() + loadLevel;
 
-        if (!smoothTransition)
-            LoadLevel(name);
+            if (!smoothTransition)
+                LoadLevel(name);
+            else
+                StartCoroutine(SmoothTransition(name));
+        }
         else
-            StartCoroutine(SmoothTransition(name));
+        {
+            LoadSceneNoPrefix(loadLevel);
+        }
 
         /*
 #if UNITY_5_3_OR_NEWER
@@ -144,16 +153,22 @@ public class DoorTrigger : MonoBehaviour, Trigger {
         string name = GetLevelNamePrefix() + loadLevel;
 
         LoadLevel(name);
-        /*
+    }
+
+    /// <summary>
+    /// Instantly loads another scene without using name prefixes
+    /// </summary>
+    public void LoadSceneNoPrefix(int number)
+    {
+        // Changes current character's current floor to the one to be loaded
+        //CharacterManager.instance.allCharacters.Find(e => e == CharacterManager.GetCurrentCharacterEntity()).currentFloor = number - 1;
+
+        CharacterManager.SetCurrentFloorOfCurrentCharacter(number - 1);
+
 #if UNITY_5_3_OR_NEWER
-        string levelNamePrefix = SceneManager.GetActiveScene().name;
-        levelNamePrefix = Regex.Replace(levelNamePrefix, @"[\d-]", string.Empty);
-        SceneManager.LoadScene(levelNamePrefix + loadLevel);
+        SceneManager.LoadScene(number);
 #else
-        string levelNamePrefix = Application.loadedLevelName;
-        levelNamePrefix = Regex.Replace(levelNamePrefix, @"[\d-]", string.Empty);
-        Application.LoadLevel(levelNamePrefix + loadLevel);
+        Application.LoadLevel(number);
 #endif
-        */
     }
 }

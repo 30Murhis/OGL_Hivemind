@@ -12,6 +12,7 @@ public class BackgroundGenerator : MonoBehaviour {
 
     [Range(3f, 49f)]
     public int chunks = 5;
+    public float floorYPosition = -5.8f;
     public bool randomOrder = true;
     public float borderOffset = 0;
     public float borderColliderOffset = 10.0f;
@@ -120,7 +121,7 @@ public class BackgroundGenerator : MonoBehaviour {
         // Ground
         child = transform.GetChild(2);
         //child.localPosition = new Vector2(0, -height / 3);-6.29'
-        child.localPosition = new Vector2(0, -6.3f);
+        child.localPosition = new Vector2(0, floorYPosition);
         child.localScale = new Vector3(totalWidth + 10, 1);
 
         // Killzone

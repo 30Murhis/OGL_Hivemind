@@ -2,6 +2,7 @@
 
 public class DebugInput : MonoBehaviour {
 
+    [HideInInspector]
     public bool allowCameraZoom = false;
 
     [HideInInspector]
@@ -20,6 +21,7 @@ public class DebugInput : MonoBehaviour {
     public string keySpawnRandomCharacter = "6";
     [HideInInspector]
     public string keySpawnRandomCharacterSomewhere = "7";
+
     [HideInInspector]
     public GameObject targetChar;
     [HideInInspector]
@@ -43,10 +45,11 @@ public class DebugInput : MonoBehaviour {
 
 #if UNITY_EDITOR
     void Update () {
+        
         if (Input.GetKeyDown(keyKillCurrentCharacter))
         {
             //hivemind.RemoveCharacter(hivemind.GetCurrentlyActiveCharacter());
-            CharacterManager.KillCharacter(CharacterManager.GetCurrentCharacterEntity());
+            CharacterManager.KillCharacter(CharacterManager.GetCurrentCharacterEntity().entityData);
         }
 
         if (targetChar)
@@ -121,7 +124,7 @@ public class DebugInput : MonoBehaviour {
         float bgWidth = FindObjectOfType<BackgroundGenerator>().GetBackgroundWidth();
         CharacterManager.SpawnCharacter(
             listOfCharacters.allCharacters[Random.Range(1, listOfCharacters.allCharacters.Count)],
-            onCurrentCharacter ? CharacterManager.GetCurrentCharacterEntity().GetGameObject().transform.position : new Vector3(Random.Range(-bgWidth / 2, bgWidth / 2), 0, 0)
+            onCurrentCharacter ? CharacterManager.GetCurrentCharacterObject().transform.position : new Vector3(Random.Range(-bgWidth / 2, bgWidth / 2), 0, 0)
         );
 
         //Character character = listOfCharacters.allCharacters[Random.Range(0, listOfCharacters.allCharacters.Count)];
@@ -178,6 +181,6 @@ public class DebugInput : MonoBehaviour {
     public void WarpTargetToCurrent()
     {
         //targetChar.transform.position = hivemind.GetCurrentlyActiveCharacter().transform.position;
-        targetChar.transform.position = CharacterManager.GetCurrentCharacterEntity().GetGameObject().transform.position;
+        targetChar.transform.position = CharacterManager.GetCurrentCharacterObject().transform.position;
     }
 }
