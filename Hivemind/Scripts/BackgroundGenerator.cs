@@ -20,7 +20,7 @@ public class BackgroundGenerator : MonoBehaviour {
     public GameObject floor;
     
     bool generateFloors = false;
-    float totalWidth = 0;
+    public float totalWidth = 0;
 
     List<int> availableBackgrounds;
     

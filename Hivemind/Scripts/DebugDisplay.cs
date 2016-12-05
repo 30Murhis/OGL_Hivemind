@@ -47,4 +47,13 @@ public class DebugDisplay : MonoBehaviour {
 	public void SetDisplayTime(float time) {
 		this.displayTime = time;
 	}
+
+    /// <summary>
+    /// Clears text from the debug display and hides it.
+    /// </summary>
+    public void ClearText()
+    {
+        CancelInvoke();
+        Hide();
+    }
 }

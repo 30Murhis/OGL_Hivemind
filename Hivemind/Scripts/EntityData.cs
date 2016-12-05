@@ -30,6 +30,12 @@ public class EntityData
     public CharacterEnums.InfectionStage currentStateOfInfection;
     [Tooltip("Current stage of suspicion.")]
     public CharacterEnums.SuspicionState currentStateOfSuspicion;
+    [Tooltip("Last position this character was on a level.")]
+    public Vector3 lastPosition;
+    [Tooltip("Character's calculated height.")]
+    public float height;
+    [Tooltip("Character's calculated height.")]
+    public float width;
 
     /// <summary>
     /// Creates EntityData from character scriptable object data.
@@ -47,6 +53,9 @@ public class EntityData
         this.isNPC = isInfected ? false : character.isOriginallyNPC;
         this.isInfected = !character.isOriginallyNPC;
         this.hasSpawned = false;
+        this.lastPosition = Vector3.zero;
+        this.height = 0;
+        this.width = 0;
 
         this.Name = character.characterName;
     }

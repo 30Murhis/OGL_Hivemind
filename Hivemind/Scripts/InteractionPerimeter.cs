@@ -10,19 +10,21 @@ public class InteractionPerimeter : MonoBehaviour
     public float perimeterRadius = 10f;
     [Tooltip("Display glow around the edges of currently chosen interactable object.")]
     public bool glowTarget = false;
+    [Tooltip("Switch sides of participants in the dialogue when current talker changes.")]
+    public bool switchSidesOfTalkers = false;
 
-    [Tooltip("List of possible interactable objects.")]
-    public List<GameObject> interactables = new List<GameObject>();
+    [Tooltip("Reference to dialogueUI script.")]
+    public DialogueUI dialogueUI;
+    [Tooltip("Material used for glow effect if glowInteractables is set to true.")]
+    public Material glowMaterial;
+
     [Tooltip("Currently chosen interactable object.")]
     public GameObject currentlyChosenObject;
     [Tooltip("Index of currently chosen interactable object.")]
     public int currentlyChosen;
 
-    [Tooltip("Reference to dialogueUI script.")]
-    public DialogueUI dialogueUI;
-
-    [Tooltip("Material used for glow effect if glowInteractables is set to true.")]
-    public Material glowMaterial;
+    [Tooltip("List of possible interactable objects.")]
+    public List<GameObject> interactables = new List<GameObject>();
 
     // Original material of the currently chosen object
     Material originalMaterial;
@@ -63,15 +65,26 @@ public class InteractionPerimeter : MonoBehaviour
 
         CharacterManager.OnCharacterChange += CharacterManager_OnCharacterChange;
         CharacterManager.OnCharacterDeath += CharacterManager_OnCharacterDeath;
+        CharacterManager.OnNewInfectedCharacter += CharacterManager_OnNewInfectedCharacter;
 
         TryFindNewParent();
     }
 
     /// <summary>
+    /// When a character gets infected, removes it from the list of interactable objects if it is found there.
+    /// </summary>
+    /// <param name="ed"></param>
+    void CharacterManager_OnNewInfectedCharacter(EntityData ed)
+    {
+        interactables.RemoveAll(go => go.GetComponent<Entity>() && go.GetComponent<Entity>().entityData == ed);
+    }
+
+    /// <summary>
     /// When character dies, sets parent to null so that this object will not be destroyed too.
+    /// <para>Also calls for TryFindNewParent().</para>
     /// </summary>
     /// <param name="i"></param>
-    void CharacterManager_OnCharacterDeath(int i)
+    void CharacterManager_OnCharacterDeath(EntityData entityData)
     {
         transform.SetParent(null);
         TryFindNewParent();
@@ -123,16 +136,36 @@ public class InteractionPerimeter : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D col)
     {
-        if (col.tag == "NPC" || col.GetComponent<Trigger>() != null)
+        // Adds collided object to list of interactables if it meets with at least 1 of the following conditions on top of the first one:
+        // - If it is not already listed in the list of interactables
+        // - If it has ITrigger interface or its tag is NPC
+        // - If it is interactable and not on CharacterManager's list of infected characters when an Entity class is found attached to the NPC tagged object
+        // - If it is a ghost object
+        if (!interactables.Contains(col.gameObject))
         {
-            if (!interactables.Contains(col.gameObject))
+            if (col.GetComponent<ITrigger>() != null)
+            {
                 interactables.Add(col.gameObject);
+            }
+            if (col.tag == "NPC")
+            {
+                Entity e = col.gameObject.GetComponent<Entity>();
+                if (e && !CharacterManager.Instance.infectedCharacters.Contains(e.entityData) && e.entityData.character.isInteractable)
+                {
+                    interactables.Add(col.gameObject);
+                }
+            }
+            if (col.name.StartsWith("Ghost"))
+            {
+                interactables.Add(col.gameObject);
+            }
         }
     }
 
     void OnTriggerExit2D(Collider2D col)
     {
-        if (col.tag == "NPC" || col.GetComponent<Trigger>() != null)
+        //if (col.tag == "NPC" || col.GetComponent<ITrigger>() != null)
+        if (interactables.Contains(col.gameObject))
         {
             interactables.Remove(col.gameObject);
 
@@ -143,9 +176,20 @@ public class InteractionPerimeter : MonoBehaviour
 
             if (currentlyChosenObject == col.gameObject)
             {
-                TryGetPreviousInteractionTarget();
+                //TryGetPreviousInteractionTarget();
+                RemoveTarget();
+                FindObjectOfType<DebugDisplay>().ClearText();
             }
         }
+    }
+
+    /// <summary>
+    /// Sets current target to null and its index to 0
+    /// </summary>
+    void RemoveTarget()
+    {
+        currentlyChosen = 0;
+        currentlyChosenObject = null;
     }
 
     /// <summary>
@@ -155,8 +199,7 @@ public class InteractionPerimeter : MonoBehaviour
     {
         if (interactables.Count == 0)
         {
-            currentlyChosen = 0;
-            currentlyChosenObject = null;
+            RemoveTarget();
         }
         else
         {
@@ -175,8 +218,7 @@ public class InteractionPerimeter : MonoBehaviour
     {
         if (interactables.Count == 0)
         {
-            currentlyChosen = 0;
-            currentlyChosenObject = null;
+            RemoveTarget();
         }
         else
         {
@@ -188,6 +230,9 @@ public class InteractionPerimeter : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Changes interaction target based on currentlyChosen variable.
+    /// </summary>
     void ChangeInteractionTarget()
     {
         if (originalMaterial != null)
@@ -195,9 +240,23 @@ public class InteractionPerimeter : MonoBehaviour
             RemoveGlow();
         }
 
+        GameObject newTarget = interactables[currentlyChosen % interactables.Count];
+        Entity e = newTarget.GetComponent<Entity>();
+
+        // If the next target would end up being an infected or non-interactable character for some reason, removes it and tries to get another target
+        if (e && (CharacterManager.Instance.infectedCharacters.Contains(e.entityData) || !e.entityData.character.isInteractable))
+        {
+            interactables.RemoveAt(currentlyChosen);
+            TryGetNextInteractionTarget();
+            return;
+        }
+
         currentlyChosenObject = interactables[currentlyChosen % interactables.Count];
 
-        FindObjectOfType<DebugDisplay>().SetText("Currently chosen interaction target: " + currentlyChosenObject.name);
+        string nameOfTarget = currentlyChosenObject.name;
+        nameOfTarget = nameOfTarget.Contains("Ghost") ? nameOfTarget.Substring("Ghost ".Length) : nameOfTarget;
+
+        FindObjectOfType<DebugDisplay>().SetText("Currently chosen interaction target: " + nameOfTarget);
 
         if (glowTarget && glowMaterial != null)
         {
@@ -208,6 +267,9 @@ public class InteractionPerimeter : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Removes glow of an object.
+    /// </summary>
     void RemoveGlow()
     {
         if (currentlyChosenObject != null && currentlyChosenObject.GetComponentInChildren<SpriteRenderer>())
@@ -234,15 +296,14 @@ public class InteractionPerimeter : MonoBehaviour
         // Check for interactable NPC
         if (obj.tag == "NPC") // && obj.GetComponent<RayNPC>()
         {
-            if (obj.name.StartsWith("Ghost")) {
-                if (obj.GetComponentInParent<Entity>().entityData.character.isInteractable)
+            if (obj.GetComponentInParent<Entity>().entityData.character.isInteractable)
+            {
+                // Check for a ghost object
+                if (obj.name.StartsWith("Ghost"))
                 {
                     discussionPartner = obj.transform.parent.gameObject;
                 }
-            }
-            else
-            {
-                if (obj.GetComponent<Entity>().entityData.character.isInteractable)
+                else
                 {
                     discussionPartner = obj;
                 }
@@ -251,9 +312,10 @@ public class InteractionPerimeter : MonoBehaviour
             InitializeDialogue();
         }
 
-        if (obj.GetComponent<Trigger>() != null)
+        // Calls for a method from ITrigger interface
+        if (obj.GetComponent<ITrigger>() != null)
         {
-            obj.GetComponent<Trigger>().Activate();
+            obj.GetComponent<ITrigger>().Activate();
         }
     }
 
@@ -270,7 +332,9 @@ public class InteractionPerimeter : MonoBehaviour
         RayNPC partnerRNPC = discussionPartner.GetComponent<RayNPC>();
 
         partnerRM.allowMovement = !active;
-        partnerRNPC.SetAIBehaviourActive(!active);
+
+        if (partnerRNPC)
+            partnerRNPC.SetAIBehaviourActive(!active);
 
         if (active)
         {
@@ -283,6 +347,9 @@ public class InteractionPerimeter : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Sets activates dialogue mode and processes the dialogue.
+    /// </summary>
     void InitializeDialogue()
     {
         if (!discussionPartner.GetComponent<VIDE_Assign>()) return;
@@ -292,6 +359,9 @@ public class InteractionPerimeter : MonoBehaviour
         ProcessDialogue();
     }
 
+    /// <summary>
+    /// Processes the dialogue and updates the dialogue UI accordingly.
+    /// </summary>
     void ProcessDialogue()
     {
         VIDE_Assign assigned = discussionPartner.GetComponent<VIDE_Assign>();
@@ -313,14 +383,20 @@ public class InteractionPerimeter : MonoBehaviour
         if (dialogueUI.dialogue.nodeData.currentIsPlayer)
         {
             dialogueUI.dialogImage.sprite = player;
-            dialogueUI.dialogImage.transform.SetAsFirstSibling();
-            dialogueUI.dialogImage.rectTransform.localScale = Vector3.one;
+            if (switchSidesOfTalkers)
+            {
+                dialogueUI.dialogImage.transform.SetAsFirstSibling();
+                dialogueUI.dialogImage.rectTransform.localScale = Vector3.one;
+            }
         }
         else
         {
             dialogueUI.dialogImage.sprite = NPC;
-            dialogueUI.dialogImage.transform.SetAsLastSibling();
-            dialogueUI.dialogImage.rectTransform.localScale = new Vector3(-1, 1, 1);
+            if (switchSidesOfTalkers)
+            {
+                dialogueUI.dialogImage.transform.SetAsLastSibling();
+                dialogueUI.dialogImage.rectTransform.localScale = new Vector3(-1, 1, 1);
+            }
         }
 
         dialogueUI.npcName.text = discussionPartner.name;

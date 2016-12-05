@@ -1,202 +1,95 @@
-﻿using System.Collections;
-using System.Linq;
-using UnityEngine;
+﻿using UnityEngine;
+using FMOD.Studio;
 
 /// <summary>
 /// Handles most of player's inputs.
 /// </summary>
 public class RayPlayerInput : MonoBehaviour {
 
+    [Tooltip("Are player inputs registered.")]
     public bool enablePlayerInput = true;
-
-    public GameObject projectile;
+    [Tooltip("The projectile prefab that is shot when left mouse is clicked.")]
+    public GameObject projectilePrefab;
+    [Tooltip("The object the spore shot is instantiated on.")]
     public GameObject sporeShotSource;
 
-    GameObject inTrigger;
-
+    [FMODUnity.EventRef]
+    [Tooltip("The FMOD sound used when spore shot is shot.")]
+    public string sporeShotSound = "event:/SFX/sporeshoot";
+    
     GameObject shot;
-    GameObject triggerIndicator;
-    GameObject ui;
-
-    CameraController cameras;
     RayMovement rayMovement;
-    CharacterInteraction characterInteraction;
-
     float facingDirection = 1;
-
-    // Use this for initialization
+    
     void Start () {
 	    if (!sporeShotSource)
             sporeShotSource = transform.FindChild("SporeShotSource").gameObject;
 
         rayMovement = GetComponent<RayMovement>();
-        characterInteraction = GetComponent<CharacterInteraction>();
-
-        ui = GameObject.FindGameObjectWithTag("UI");
-        triggerIndicator = ui.transform.FindChild("TriggerIndicator").gameObject;
-
-        cameras = FindObjectOfType<CameraController>();
     }
-	
-	void Update ()
-    {
-        // Interaction with NPC's (hard coded key for now)
-        //characterInteraction.TryInteraction = Input.GetKeyDown(KeyCode.E);
 
+    void Update()
+    {
+        // Try interaction via InteractionPerimeter
         if (Input.GetKeyDown(KeyCode.E))
         {
-            if (transform.GetComponentInChildren<InteractionPerimeter>())
-                transform.GetComponentInChildren<InteractionPerimeter>().InteractWithCurrentTarget();
+            InteractionPerimeter.Instance.InteractWithCurrentTarget();
         }
 
+        // If player input is disabled, stops here, allowing only inputs above this to be registered
         if (!enablePlayerInput) return;
 
+        // Change interaction target
         if (Input.GetKeyDown(KeyCode.Q))
         {
-            if (transform.GetComponentInChildren<InteractionPerimeter>())
-                transform.GetComponentInChildren<InteractionPerimeter>().TryGetNextInteractionTarget();
+            InteractionPerimeter.Instance.TryGetNextInteractionTarget();
         }
 
         // Shooting
         if (Input.GetButtonDown("Fire1"))
         {
-            if (projectile) Shoot();
+            if (projectilePrefab)
+            {
+                Shoot();
+            }
+            else
+            {
+                Debug.LogWarning("Could not shoot; unassigned spore shot prefab.", this);
+            }
         }
 
-        // Horizontal & vertical movement
+        // Horizontal & vertical movement (even though vertical is pointless in this game)
         rayMovement.CharacterInput = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
 
+        // Set facing direction based on movement direction
         if (rayMovement.CharacterInput != Vector2.zero)
             facingDirection = Mathf.Sign(rayMovement.CharacterInput.x);
 
-        // Jumping (hard coded key for now)
+        // Jumping
         rayMovement.Jump = Input.GetKeyDown(KeyCode.Space); // GetKey() enables bunny hopping
 
-        // Running (hard coded key for now)
+        // Running
         rayMovement.Run = Input.GetKey(KeyCode.LeftShift);
 
-        if (rayMovement.CharacterInput != Vector2.zero)
-        {
-            // If running, sets camera's x offset
-            if (rayMovement.Run) cameras.SetRunXOffset((int)rayMovement.CharacterInput.x);
+        // Run camera activation based on speed, run state and direction
+        CameraController.Instance.ActivateRunCamera((rayMovement.velocity.x != 0 && rayMovement.Run), (int)rayMovement.CharacterInput.x);
 
-            // If run is pressed down, activates run camera
-            if (Input.GetKeyDown(KeyCode.LeftShift))
-            {
-                cameras.ActivateRunCamera(true);
-            }
-        }
-
-        // If run button is released, deactivates run camera and x offset
-        if (Input.GetKeyUp(KeyCode.LeftShift))
-        {
-            cameras.ActivateRunCamera(false);
-            cameras.offsetX = 0;
-        }
-
-        // Trigger activation (hard coded key for now)
-        if (Input.GetKeyDown(KeyCode.F) && inTrigger != null)
-        {
-            if (inTrigger.GetComponent<DoorTrigger>() && inTrigger.GetComponent<DoorTrigger>().smoothTransition)
-            {
-                enablePlayerInput = false;
-                //StartCoroutine(rayMovement.WalkToPreviousLevel(inTrigger, 2));
-
-                //StartCoroutine(SmoothLevelTransition());
-                inTrigger.GetComponent<Trigger>().Activate();
-            }
-            if (inTrigger.GetComponent<ElevatorTrigger>())
-                inTrigger.GetComponent<ElevatorTrigger>().requirementMet = transform.name.Contains(inTrigger.GetComponent<ElevatorTrigger>().requiredAuthorization) ? true : false;
-
-            inTrigger.GetComponent<Trigger>().Activate();
-        }
-
+        // Character changing
         if (Input.GetKeyDown(KeyCode.Tab))
         {
             CharacterManager.ChangeCurrentCharacter();
         }
-
-        // Up (climb, go up in levels) (hard coded key for now)
-        if (Input.GetKey(KeyCode.W))
-        {
-            //StartCoroutine(rayMovement.GoToHigherGroundLevel());
-            //rayMovement.MoveToHigherGroundLevel();
-
-        }
-
-        // Down (go down in levels) (hard coded key for now)
-        if (Input.GetKey(KeyCode.S))
-        {
-            //StartCoroutine(rayMovement.GoToLowerGroundLevel());
-            //rayMovement.MoveToLowerGroundLevel();
-        }
     }
 
+    /// <summary>
+    /// Attempts to shoot. Only happens when there is no previous shots in the level.
+    /// </summary>
     void Shoot()
     {
-        // Gets mouse position from screen
-        //Vector2 target = Camera.main.ScreenToWorldPoint(new Vector2(Input.mousePosition.x, Input.mousePosition.y));
-        //Vector2 myPos = new Vector2(sporeShotSource.transform.position.x, sporeShotSource.transform.position.y);
-        //Debug.Log("Facing " + facingDirection);
-
-        // Creates the projectile
-
         if (shot == null)
-            shot = (GameObject)Instantiate(projectile, sporeShotSource.transform.position, Quaternion.Euler(new Vector3(0, facingDirection > 0 ? 0 : 180, 0)));
-
-        // Uses object pool to spawn a projectile
-        //shot = ObjectPool.current.Spawn(projectile, sporeShotSource.transform.position, Quaternion.identity);
-
-        //  Sets projectile's direction towards the mouse position
-        //shot.GetComponent<SporeShot>().SetDirection(target - myPos);
-    }
-
-    void OnTriggerExit2D(Collider2D col)
-    {
-        // OnTrigger's activate even though script is disabled,
-        // so prevent these codes from activating unless this script is enabled
-        if (!isActiveAndEnabled || !triggerIndicator) return;
-
-        triggerIndicator.SetActive(false);
-        inTrigger = null;
-    }
-
-    
-    void OnTriggerStay2D(Collider2D col)
-    {
-        // OnTrigger's activate even though script is disabled,
-        // so prevent these codes from activating unless this script is enabled
-        if (!isActiveAndEnabled || !triggerIndicator) return;
-
-        // If in trigger that uses Trigger interface, get the trigger
-        if (col.GetComponent(typeof(Trigger)) && !triggerIndicator.activeInHierarchy)
         {
-            triggerIndicator.SetActive(true);
-            //inTrigger = col.GetComponent<Trigger>();
-            inTrigger = col.gameObject;
+            FMODUnity.RuntimeManager.PlayOneShot(sporeShotSound, gameObject.transform.position);
+            shot = (GameObject)Instantiate(projectilePrefab, sporeShotSource.transform.position, Quaternion.Euler(new Vector3(0, facingDirection > 0 ? 0 : 180, 0)));
         }
-    }
-    
-    IEnumerator SmoothLevelTransition()
-    {
-        Debug.Log("SmoothTransition");
-        inTrigger.transform.root.GetComponents<MonoBehaviour>().ToList().ForEach(s => Destroy(s));
-        inTrigger.transform.root.GetComponentsInChildren<SpriteRenderer>().ToList().ForEach(sr => sr.color = new Color(255, 255, 255, 1));
-        Vector3 targetPos = Vector3.zero;
-        targetPos.x = transform.position.x;
-        //Vector3 dif = inTrigger.GetComponent<Collider2D>().bounds.center - inTrigger.transform.root.position;
-        GameObject parent = inTrigger.transform.root.gameObject;
-        inTrigger.transform.SetParent(null);
-        parent.transform.SetParent(inTrigger.transform);
-        while(inTrigger.transform.root.position != targetPos)
-        //while(inTrigger.GetComponent<Collider2D>().bounds.center != targetPos)
-        {
-            GetComponentInChildren<Animator>().SetFloat("Speed", 1);
-            inTrigger.transform.root.position = Vector3.MoveTowards(inTrigger.transform.root.position, targetPos, 4f * Time.deltaTime);
-            yield return null;
-        }
-        transform.position = new Vector2(41.29f, transform.position.y);
-        inTrigger.transform.position = new Vector2(40.93f, 0);
-        inTrigger.GetComponent<DoorTrigger>().ActivateScene();
     }
 }

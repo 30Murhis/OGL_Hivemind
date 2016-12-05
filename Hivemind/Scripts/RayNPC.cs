@@ -92,9 +92,14 @@ public class RayNPC : MonoBehaviour {
                     rayMovement.Run = true;
                     break;
             }
+
+            Sight();
         }
 
-		Sight();
+        if (currentState == State.Infected)
+        {
+            Debug.Log("ASD: " + rayMovement.CharacterInput);
+        }
     }
 
     void StateRandomization()
@@ -153,7 +158,8 @@ public class RayNPC : MonoBehaviour {
     /// </summary>
     public void Infect()
     {
-        enableSimpleAI = false;
+        SetAIBehaviourActive(false);
+        currentState = State.Infected;
         tag = "Player";
         name = "Infected " + gameObject.name;
         rayMovement.CharacterInput = Vector2.zero;
@@ -205,7 +211,7 @@ public class RayNPC : MonoBehaviour {
 
 		Debug.DrawLine (SightStart.position, SightEnd.position , Color.blue);
 		if (Physics2D.Linecast (SightStart.position, SightEnd.position,1 << LayerMask.NameToLayer("Player"))) {
-			print ("detected !");
+			//print ("detected !");
 		}
 
 	}

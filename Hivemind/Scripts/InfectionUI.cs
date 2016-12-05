@@ -14,8 +14,9 @@ public class InfectionUI : MonoBehaviour {
         CharacterManager.OnCharacterDeath += CharacterManager_OnCharacterDeath;
     }
 
-    void CharacterManager_OnCharacterDeath(int i)
+    void CharacterManager_OnCharacterDeath(EntityData entityData)
     {
+        int i = CharacterManager.Instance.infectedCharacters.IndexOf(entityData);
         transform.GetChild(i).GetComponent<Image>().fillAmount = 1;
         Destroy(transform.GetChild(i).gameObject);
     }
@@ -36,14 +37,14 @@ public class InfectionUI : MonoBehaviour {
 
     void CharacterManager_OnInfectionAdvance()
     {
-        for (int i = 0; i < CharacterManager.instance.infectedCharacters.Count; i++)
+        for (int i = 0; i < CharacterManager.Instance.infectedCharacters.Count; i++)
         {
-            if (transform.childCount < CharacterManager.instance.infectedCharacters.Count)
+            if (transform.childCount < CharacterManager.Instance.infectedCharacters.Count)
             {
-                SpawnInfectionDisplayer(CharacterManager.instance.infectedCharacters[i]);
+                SpawnInfectionDisplayer(CharacterManager.Instance.infectedCharacters[i]);
             }
 
-            EntityData ed = CharacterManager.instance.infectedCharacters[i];
+            EntityData ed = CharacterManager.Instance.infectedCharacters[i];
             transform.GetChild(i).FindChild("InfectionStage").GetComponent<Text>().text = ed.currentStateOfInfection.ToString();
             transform.GetChild(i).GetComponent<Image>().fillAmount = (((float)ed.character.infectionStageDuration - (float)ed.currentInfectionStageDuration) / (float)ed.character.infectionStageDuration);
         }

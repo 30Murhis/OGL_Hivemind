@@ -1,41 +1,76 @@
 ﻿using System.Collections;
 using UnityEngine;
 
-public class CameraController : MonoBehaviour {
-    
-    public GameObject background;
-    public Transform target;
-
-    public Transform mainCamera;
-    public Transform supportCamera;
-
-    public float offsetX = 0;
-    public float offsetY = 0;
-
-    float offsetZ = -10;
-    float width;
-
-    public bool lockToTarget = true;
-    [HideInInspector] public bool lockedToTarget = true;
-
-    Vector2 newTargetPos;
-    [Range(0f, 10f)] public float cameraMoveSpeed = 10.0f;
-
-    public float zoomRate = 0.3f;
-    public float normalZoomLevel = 9.5f;
-    public float runZoomLevel = 14f;
-    public float runXOffset = 5f;
-
-    bool returningFromZoom = false;
-    
-    float defaultDistanceForRelock = 1f;
-    float actualDistanceForRelock;
-
-    IEnumerator zoomCoroutine;
-
+/// <summary>
+/// Camera controller for 2D looping view camera rig.
+/// <para>Controls two cameras to create an illusion of looping and infinite 2D scene.</para>
+/// </summary>
+public class CameraController : MonoBehaviour
+{
     public static CameraController Instance;
 
-    void Start()
+    [Header("References")]
+    [Tooltip("Background object, from which the distance between the two cameras can be retrieved.")]
+    public GameObject background;
+    [Tooltip("The object the camera is following.")]
+    public Transform target;
+
+    [Tooltip("The main camera object.")]
+    public Transform mainCamera;
+    [Tooltip("The support camera object.")]
+    public Transform supportCamera;
+
+    [Header("Camera Offsets")]
+    [Tooltip("Constant x-offset. NOTE: not implemented completely.")]
+    public float offsetX = 0;
+    [Tooltip("Constant y-offset. Calculated to be half of the target's height.")]
+    public float offsetY = 0;
+    [Tooltip("Constant z-offset. Set to -10, because that's the default camera z-offset in 2D view.")]
+    public float offsetZ = -10;
+    [Tooltip("Running x-offset.")]
+    public float offsetXForRun = 5f;
+
+    [Header("Camera Zoom")]
+    [Tooltip("Default zoom level for normal situations.")]
+    public float normalZoomLevel = 9.5f;
+    [Tooltip("Run zoom level, towards which the camera goes when running.")]
+    public float runZoomLevel = 14f;
+    [Tooltip("Determines how much zoom level changes every 10ms.")]
+    public float zoomRate = 0.3f;
+    
+    [Header("Other")]
+    [Tooltip("Camera's movement speed, which determines how fast it reaches CameraTargetPosition")]
+    [Range(0f, 100f)]
+    public float normalCameraMoveSpeed = 25.0f;
+    [Tooltip("Maximum camera speed multiplier, which activates when distance to target is greater than run offset. Used to move camera faster the further the target is.")]
+    [Range(1f, 10f)]
+    public float maxCameraMoveSpeedMultiplier = 5.0f;
+    [Tooltip("The actual position the camera is moving towards.")]
+    public Vector3 cameraTargetPosition;
+
+    float offsetXRunCurrent = 0;
+    float backgroundWidth;
+    float cameraMoveSpeedMultiplier = 1f;
+    CameraState currentCameraState;
+    RunCameraZoomState runCameraZoomState;
+    IEnumerator zoomCoroutine;
+
+    public enum CameraState
+    {
+        Idle,
+        Walk,
+        Run,
+        MissingTarget
+    }
+
+    enum RunCameraZoomState
+    {
+        Inactive,
+        ZoomingIn,
+        ZoomingOut
+    }
+
+    void Awake()
     {
         if (Instance == null)
         {
@@ -47,48 +82,57 @@ public class CameraController : MonoBehaviour {
             Destroy(gameObject);
             return;
         }
+    }
 
+    void Start()
+    {
         // If main camera not set, gets it
         if (!mainCamera) mainCamera = Camera.main.transform;
 
-        // If support camera not set, tries to get the 2nd child
-        if (!supportCamera) supportCamera = transform.GetChild(1);
+        // If support camera not set, tries to find it from children
+        if (!supportCamera) // supportCamera = transform.GetChild(1);
+        {
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                Transform child = transform.GetChild(i);
+                if (child.GetComponent<Camera>() && child != Camera.main.transform)
+                {
+                    supportCamera = child;
+                    break;
+                }
+            }
+        }
 
         // If background object not set, finds one
         if (background == null) background = FindObjectOfType<BackgroundGenerator>().gameObject;
 
+        // Gets map's width, which is used to set support camera position
         SetSupportCameraDistance();
 
-        // Setting the main camera to center and the support camera to the side
+        // Set the main camera to center and the support camera to the side
         mainCamera.localPosition = new Vector3(0, mainCamera.localPosition.y, offsetZ);
-        supportCamera.localPosition = new Vector3(width, supportCamera.localPosition.y, offsetZ);
+        supportCamera.localPosition = new Vector3(backgroundWidth, supportCamera.localPosition.y, offsetZ);
 
         // If target is set, sets target to parent object
         if (target)
             transform.SetParent(target);
 
-        // Subscribe to character manager's current character change event
-        CharacterManager.OnCharacterChange += CharacterManager_OnCharacterChange;
-    }
+        // Set zoom levels to normal zoom levels
+        mainCamera.GetComponent<Camera>().orthographicSize = normalZoomLevel;
+        supportCamera.GetComponent<Camera>().orthographicSize = normalZoomLevel;
 
-    void SetSupportCameraDistance()
-    {
-        // Setting the support camera distance from the main camera based on background's width.
-        for (int i = 0; i < background.transform.childCount; i++)
-        {
-            if (background.transform.GetChild(i).name.Contains("Background"))
-                width += background.transform.GetChild(i).GetComponent<SpriteRenderer>().bounds.size.x;
-        }
+        // Subscribe to character manager's character events
+        CharacterManager.OnCharacterChange += CharacterManager_OnCharacterChange;
+        CharacterManager.OnCharacterDeath += CharacterManager_OnCharacterDeath;
+
+        // Set default camera state and zoom state
+        currentCameraState = CameraState.Idle;
+        runCameraZoomState = RunCameraZoomState.Inactive;
     }
 
     /// <summary>
-    /// Method to call when character gets changed in character manager.
+    /// Update camera positions in late update just to make sure the target object's positions are updated first.
     /// </summary>
-    void CharacterManager_OnCharacterChange()
-    {
-        ChangeTarget(CharacterManager.GetCurrentCharacterObject());
-    }
-
     void LateUpdate()
     {
         if (background == null)
@@ -97,137 +141,218 @@ public class CameraController : MonoBehaviour {
             SetSupportCameraDistance();
         }
 
-        // If target is not found/set
-        if (!target)
-        {
-            // Asks character manager to provide a new target
-            GameObject newTarget = CharacterManager.GetCurrentCharacterObject();
+        CheckForTarget();
 
-            // If new target is found, changes target to it
-            if (newTarget)
-                ChangeTarget(newTarget);
-
-            // If target is still not set, begins zooming (can be commented away, it was just random thing for now)
-            if (!target)
-            {
-                Camera.main.orthographicSize -= Time.deltaTime * 0.25f;
-                supportCamera.GetComponent<Camera>().orthographicSize -= Time.deltaTime * 0.25f;
-                return;
-            }
-        }
-
-        //if (!FindObjectOfType<AdvancedHivemind>()) return;
-
-        //if (target == null) ChangeTarget(FindObjectOfType<AdvancedHivemind>().hivemind[0].Character);
-
-        if (lockedToTarget && lockToTarget)
-        {
-
-            // Sets the main camera's position to target's position
-            transform.position = new Vector3(target.transform.position.x - offsetX, target.transform.position.y + offsetY, offsetZ);
-
-        }
-        else if (!returningFromZoom)
-        {
-            //newTargetPos = new Vector2(target.transform.position.x, target.transform.position.y + offsetY);
-
-            /* Lerp version */
-            transform.position = Vector2.Lerp(transform.position, newTargetPos, Time.deltaTime * cameraMoveSpeed);
-            if (Vector2.Distance(transform.position, newTargetPos) < defaultDistanceForRelock / cameraMoveSpeed)
-            {
-                if (lockToTarget) lockedToTarget = true;
-            }
-
-            /* MoveTowards version 
-            transform.position = Vector2.MoveTowards(transform.position, newTargetPos, cameraMoveSpeed * Time.deltaTime);
-            if (transform.position == newTargetPos && lockToTarget) lockedToTarget = true;
-            */
-        }
-        else
-        {
-            newTargetPos = new Vector2(target.transform.position.x, target.transform.position.y + offsetY);
-
-            transform.position = Vector2.Lerp(transform.position, newTargetPos, Time.deltaTime * cameraMoveSpeed);
-            if (Vector2.Distance(transform.position, newTargetPos) < defaultDistanceForRelock / cameraMoveSpeed)
-            {
-                if (lockToTarget) lockedToTarget = true;
-                returningFromZoom = false;
-            }
-        }
+        MoveCamera();
 
         // Sets the support camera's x-position to the opposite side of the map.
         if (Mathf.Sign(transform.position.x) == Mathf.Sign(supportCamera.localPosition.x))
         {
             supportCamera.localPosition = new Vector3(supportCamera.localPosition.x * -1, supportCamera.localPosition.y, supportCamera.localPosition.z);
-            //supportCamera.GetComponent<Camera>().depth *= -1;
         }
     }
 
-    //public void ChangeTargetSmooth(GameObject target, float cameraSpeed)
-    //{
-    //    ChangeTarget(target);
-    //    cameraMoveSpeed = cameraSpeed;
-    //    actualDistanceForRelock = defaultDistanceForRelock / cameraMoveSpeed;
-    //}
+    /// <summary>
+    /// Moves camera towards camera target position based on current CameraState.
+    /// </summary>
+    void MoveCamera()
+    {
+        switch (currentCameraState)
+        {
+            // Idle and Walk behaviour are the same, at least for now.
+            case CameraState.Idle:
+            case CameraState.Walk:
+                cameraTargetPosition = target.position;
+                break;
+            case CameraState.Run:
+                cameraTargetPosition = new Vector3(target.position.x, target.position.y, target.position.z);
+                cameraTargetPosition.x += offsetXRunCurrent;
+                break;
+            case CameraState.MissingTarget:
+                ChangeZoomLevelWithSteps(0.5f * Time.deltaTime, false, 20f);
+                return;
+        }
 
-    //void SetTarget(Transform target)
-    //{
-    //    target.GetComponent<Entity>().OnDeath -= CameraController_OnDeath;
-    //    this.target = target;
-    //    target.GetComponent<Entity>().OnDeath += CameraController_OnDeath;
-    //}
+        // Set/add constant offsets
+        cameraTargetPosition.x += offsetX;
+        cameraTargetPosition.y += offsetY;
+        cameraTargetPosition.z = offsetZ; // z offset is not added, instead it is always kept at certain point
 
-    //private void CameraController_OnDeath()
-    //{
-    //    if (target)
-    //        transform.SetParent(target);
-    //    else
-    //        transform.SetParent(null);
-    //}
+        // Calculate x axis distance to target
+        float distance = Mathf.Abs(cameraTargetPosition.x - transform.position.x);
+
+        // Set camera speed multiplier to a value based on distance, if the distance is outside the run offset range
+        //cameraMoveSpeedMultiplier = distance > offsetXForRun ? Mathf.Clamp(distance, 1f, maxCameraMoveSpeedMultiplier) : 1f;
+
+        // If distance is outside the run offset range, sets multiplier to distance clamped between 1 and given maximum multiplier
+        if (distance > offsetXForRun * 2)
+            cameraMoveSpeedMultiplier = Mathf.Clamp(distance, 1f, maxCameraMoveSpeedMultiplier);
+        else
+            cameraMoveSpeedMultiplier = 1f;
+
+        // Move the camera rig towards the camera target position.
+        // Because the main camera's local position is at (0,0,0),
+        // this keeps the main camera at the target position.
+        transform.position = Vector3.MoveTowards(transform.position, cameraTargetPosition, normalCameraMoveSpeed * Time.deltaTime * cameraMoveSpeedMultiplier);
+    }
+
+    /// <summary>
+    /// If character death event occurs, stops being that character's child.
+    /// </summary>
+    /// <param name="entityData"></param>
+    void CharacterManager_OnCharacterDeath(EntityData entityData)
+    {
+        if (target.GetComponent<Entity>().entityData == entityData)
+        {
+            target = null;
+            transform.parent = null;
+        }
+    }
+
+    /// <summary>
+    /// When character change event occurs, changes camera target.
+    /// </summary>
+    void CharacterManager_OnCharacterChange()
+    {
+        ChangeTarget(CharacterManager.GetCurrentCharacterObject());
+    }
+
+    /// <summary>
+    /// Checks if target is set and accessible. If not, tries to get a new target.
+    /// <para>If target cannot be set or found, sets camera state to MissingTarget.</para>
+    /// </summary>
+    void CheckForTarget()
+    {
+        if (!target || !target.gameObject.activeInHierarchy)
+        {
+            GameObject newTarget = CharacterManager.GetCurrentCharacterObject();
+            
+            if (newTarget)
+            {
+                ChangeTarget(newTarget);
+            }
+        }
+        
+        if (!target)
+        {
+            currentCameraState = CameraState.MissingTarget;
+        }
+    }
+
+    /// <summary>
+    /// Sets width, which is used to set support camera's distance from the main camera.
+    /// </summary>
+    void SetSupportCameraDistance()
+    {
+        // If width is obtainable from BackgroundGenerator, gets it
+        BackgroundGenerator bgGen = FindObjectOfType<BackgroundGenerator>();
+        if (bgGen && bgGen.GetBackgroundWidth() > 0)
+        {
+            backgroundWidth = bgGen.GetBackgroundWidth();
+            return;
+        }
+        
+        // If width is still not set, calculates it from backgrounds child's
+        for (int i = 0; i < background.transform.childCount; i++)
+        {
+            if (background.transform.GetChild(i).name.Contains("Background"))
+                backgroundWidth += background.transform.GetChild(i).GetComponent<SpriteRenderer>().bounds.size.x;
+        }
+    }
+
+    /// <summary>
+    /// Sets camera's target position to new position.
+    /// </summary>
+    /// <param name="position">New camera target position.</param>
+    void SetCameraTargetPosition(Vector3 position)
+    {
+        cameraTargetPosition = position;
+    }
+
+    /// <summary>
+    /// Set current camera state to a new one.
+    /// </summary>
+    /// <param name="newState">New state for the camera.</param>
+    public void SetCameraState(CameraState newState)
+    {
+        currentCameraState = newState;
+    }
 
     /// <summary>
     /// Changes target object of the camera to follow.
     /// </summary>
-    /// <param name="target"></param>
+    /// <param name="target">Target object.</param>
     public void ChangeTarget(GameObject target)
     {
-        lockedToTarget = false;
-        this.target = target.transform; //SetTarget(target.transform);
-        newTargetPos = new Vector2(target.transform.position.x, target.transform.position.y + offsetY);
+        if (!target)
+        {
+            transform.SetParent(null);
+            SetCameraState(CameraState.MissingTarget);
+            return;
+        }
+
+        this.target = target.transform;
         transform.SetParent(this.target);
+        offsetY = CharacterManager.GetCurrentCharacterHeight() / 2;
     }
 
     /// <summary>
-    /// Changes x-axis offset for the camera towards wanted direction.
+    /// Changes x-axis' run offset for the camera towards wanted direction.
     /// </summary>
     /// <param name="direction">Chosen direction. -1 => left, 1 => right in x-axis.</param>
     public void SetRunXOffset(int direction)
     {
-        //offsetX = Mathf.Sign(direction) * -runXOffset;
-        lockedToTarget = false;
-        newTargetPos = new Vector2(target.transform.position.x + Mathf.Sign(direction) * runXOffset, target.transform.position.y + offsetY);
+        offsetXRunCurrent = Mathf.Sign(direction) * offsetXForRun;
     }
 
     /// <summary>
     /// Activates/deactivates run camera with its zoom levels and offsets.
     /// </summary>
-    /// <param name="value"></param>
-    public void ActivateRunCamera(bool value)
+    /// <param name="activate">Activate run camera.</param>
+    /// <param name="direction">Movement direction. Required if value = true.</param>
+    public void ActivateRunCamera(bool activate, int direction = 0)
     {
-        if (zoomCoroutine != null) StopCoroutine(zoomCoroutine);
-        if (value)
+        if (activate && direction == 0)
         {
-            zoomCoroutine = ChangeZoomLevel(runZoomLevel);
-            returningFromZoom = false;
+            //Debug.LogWarning("Run camera activation failed; direction set to 0, when it needs to be something else.", gameObject);
+            return;
+        }
+
+        if (activate)
+        {
+            if (runCameraZoomState != RunCameraZoomState.ZoomingOut)
+            {
+                EndPreviousZoomCoroutine();
+                zoomCoroutine = ChangeZoomLevel(runZoomLevel);
+                StartCoroutine(zoomCoroutine);
+            }
+
+            SetRunXOffset(direction);
+            currentCameraState = CameraState.Run;
         }
         else
         {
-            zoomCoroutine = ChangeZoomLevel(normalZoomLevel);
-            lockedToTarget = false;
-            returningFromZoom = true;
-            newTargetPos = new Vector2(target.transform.position.x, target.transform.position.y + offsetY);
+            if (runCameraZoomState != RunCameraZoomState.ZoomingIn)
+            {
+                EndPreviousZoomCoroutine();
+                zoomCoroutine = ChangeZoomLevel(normalZoomLevel);
+                StartCoroutine(zoomCoroutine);
+            }
+
+            currentCameraState = CameraState.Walk;
         }
-        StartCoroutine(zoomCoroutine);
+    }
+
+    /// <summary>
+    /// If a zoom coroutine is running, stops it and sets run camera zoom state to inactive.
+    /// </summary>
+    void EndPreviousZoomCoroutine()
+    {
+        if (zoomCoroutine != null)
+        {
+            StopCoroutine(zoomCoroutine);
+            runCameraZoomState = RunCameraZoomState.Inactive;
+        }
     }
 
     /// <summary>
@@ -242,6 +367,8 @@ public class CameraController : MonoBehaviour {
 
         if (beginningValue > targetValue)
         {
+            currentCameraState = CameraState.Run;
+            runCameraZoomState = RunCameraZoomState.ZoomingIn;
             while (mainCamera.GetComponent<Camera>().orthographicSize > targetValue)
             {
                 mainCamera.GetComponent<Camera>().orthographicSize -= zoomRate;
@@ -251,6 +378,8 @@ public class CameraController : MonoBehaviour {
         }
         else if (beginningValue < targetValue)
         {
+            currentCameraState = CameraState.Walk;
+            runCameraZoomState = RunCameraZoomState.ZoomingOut;
             while (mainCamera.GetComponent<Camera>().orthographicSize < targetValue)
             {
                 mainCamera.GetComponent<Camera>().orthographicSize += zoomRate;
@@ -258,13 +387,67 @@ public class CameraController : MonoBehaviour {
                 yield return new WaitForSeconds(0.001f);
             }
         }
+
+        mainCamera.GetComponent<Camera>().orthographicSize = targetValue;
+        supportCamera.GetComponent<Camera>().orthographicSize = targetValue;
+        runCameraZoomState = RunCameraZoomState.Inactive;
     }
 
-    public void ChangeZoomLevelInstant(float direction)
+    /// <summary>
+    /// Increases/decreases camera's zoom levels towards a given direction.
+    /// </summary>
+    /// <param name="direction">Direction to change to. Positive number zooms in, negative zooms out.</param>
+    public void ChangeZoomLevelToDirection(float direction)
     {
         float newZoomLevel = 0.5f * Mathf.Sign(direction);
         mainCamera.GetComponent<Camera>().orthographicSize += newZoomLevel;
         supportCamera.GetComponent<Camera>().orthographicSize += newZoomLevel;
         normalZoomLevel += newZoomLevel;
+    }
+
+    /// <summary>
+    /// Sets camera's zoom level to a given value.
+    /// <para>Clamps the value between 0 and 30.</para>
+    /// </summary>
+    /// <param name="value">Value of the new zoom level.</param>
+    public void ChangeZoomLevelToValue(float value)
+    {
+        float newZoomLevel = Mathf.Clamp(value, 0f, 30f);
+        mainCamera.GetComponent<Camera>().orthographicSize = newZoomLevel;
+        supportCamera.GetComponent<Camera>().orthographicSize = newZoomLevel;
+    }
+
+    /// <summary>
+    /// Changes camera's zoom level based on given steps.
+    /// <para>Can be set to keep the minimum zoom level of 0.</para>
+    /// <para>Default step direction is positive, which means zooming out.</para>
+    /// <para>Zooming in can be achieved by setting the step to a negative value.</para>
+    /// </summary>
+    /// <param name="step">Change per call.</param>
+    /// <param name="keepOverZero">Do not allow zoom level to go negative.</param>
+    /// <param name="maxValue">Max value of zoom level. Note that if keepOverZero = false and step is negative, it will not go below -maxValue.</param>
+    public void ChangeZoomLevelWithSteps(float step, bool keepOverZero = false, float maxValue = 0)
+    {
+        Camera main = mainCamera.GetComponent<Camera>();
+        Camera support = supportCamera.GetComponent<Camera>();
+
+        if (keepOverZero)
+        {
+            if (main.orthographicSize <= 0)
+            {
+                return;
+            }
+        }
+
+        if (maxValue > 0)
+        {
+            if (main.orthographicSize >= maxValue || main.orthographicSize <= -maxValue)
+            {
+                return;
+            }
+        }
+
+        main.orthographicSize += step;
+        support.orthographicSize += step;
     }
 }
