@@ -513,10 +513,7 @@ public class CharacterManager : MonoBehaviour {
     /// <param name="enabled">Set player control enabled.</param>
     public static void SetPlayerControl(EntityData entityData, bool enabled)
     {
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> refs/remotes/origin/master
+
         GameObject go = entityData.GetGameObject();
 
         if (enabled)
@@ -529,19 +526,7 @@ public class CharacterManager : MonoBehaviour {
             go.layer = LayerMask.NameToLayer("Character");
             //Destroy(go.GetComponent<DontDestroy>());
         }
-<<<<<<< HEAD
-=======
-=======
-		if (enabled) {
-			entity.gameObject.layer = LayerMask.NameToLayer("Player");
-
-		} else {
-			entity.gameObject.layer = LayerMask.NameToLayer("Character");
-		}
-
-        GameObject go = entity.GetGameObject();
->>>>>>> refs/remotes/origin/master
->>>>>>> refs/remotes/origin/master
+			
 
         // Stop movement so that character does not stay running forever in case it was running
         go.GetComponent<RayMovement>().Run = false;
