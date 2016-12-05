@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public interface Trigger {
+public interface ITrigger {
 	void Activate();
 }

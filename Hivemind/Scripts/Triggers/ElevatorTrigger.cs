@@ -2,7 +2,7 @@
 using System.Collections;
 using UnityEngine.SceneManagement;
 
-public class ElevatorTrigger : MonoBehaviour, Trigger {
+public class ElevatorTrigger : MonoBehaviour, ITrigger {
 
     public string requiredAuthorization = "Guard";
     public bool requirementMet = false;

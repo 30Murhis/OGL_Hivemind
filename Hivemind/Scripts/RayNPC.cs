@@ -10,6 +10,11 @@ public class RayNPC : MonoBehaviour {
 
     public bool enableStateLogging = false;
 
+	// initialize the AI eyesight
+	public float sightRange = 5f;
+	public Transform SightStart, SightEnd;
+
+
     enum State
     {
         Infected,
@@ -87,6 +92,13 @@ public class RayNPC : MonoBehaviour {
                     rayMovement.Run = true;
                     break;
             }
+
+            Sight();
+        }
+
+        if (currentState == State.Infected)
+        {
+            Debug.Log("ASD: " + rayMovement.CharacterInput);
         }
     }
 
@@ -146,7 +158,8 @@ public class RayNPC : MonoBehaviour {
     /// </summary>
     public void Infect()
     {
-        enableSimpleAI = false;
+        SetAIBehaviourActive(false);
+        currentState = State.Infected;
         tag = "Player";
         name = "Infected " + gameObject.name;
         rayMovement.CharacterInput = Vector2.zero;
@@ -189,4 +202,18 @@ public class RayNPC : MonoBehaviour {
                 transform.localScale = new Vector3(ls.x * -1, ls.y, ls.z);
         }
     }
+
+	void Sight(){
+
+
+
+		SightEnd.position = new Vector2(SightStart.position.x + sightRange * moveDirection, SightStart.position.y);
+
+		Debug.DrawLine (SightStart.position, SightEnd.position , Color.blue);
+		if (Physics2D.Linecast (SightStart.position, SightEnd.position,1 << LayerMask.NameToLayer("Player"))) {
+			//print ("detected !");
+		}
+
+	}
 }
+

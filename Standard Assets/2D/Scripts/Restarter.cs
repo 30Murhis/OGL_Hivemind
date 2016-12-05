@@ -5,11 +5,11 @@ namespace UnityStandardAssets._2D
 {
     public class Restarter : MonoBehaviour
     {
-        private void OnTriggerEnter2D(Collider2D other)
+        private void OnTriggerEnter2D(Collider2D collider)
         {
-            if (other.tag == "Player")
+            if (collider.tag == "Player")
             {
-                Application.LoadLevel(Application.loadedLevelName);
+                //Application.LoadLevel(Application.loadedLevelName);
             }
         }
     }

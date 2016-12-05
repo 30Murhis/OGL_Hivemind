@@ -164,17 +164,21 @@ public class CharacterEditor : EditorWindow
         if (characters)
         {
             GUILayout.Space(10);
-            if (GUILayout.Button("DEBUG: Populate list", GUILayout.ExpandWidth(false)))
-            {
-                CreateMultipleNewCharacters(20);
-            }
-            GUILayout.Space(20);
-            GUILayout.Label("List of all characters:", EditorStyles.boldLabel);
+
+            // Debug instant list population
+            //if (GUILayout.Button("DEBUG: Populate list", GUILayout.ExpandWidth(false)))
+            //{
+            //    CreateMultipleNewCharacters(20);
+            //}
+            //GUILayout.Space(20);
+
+            GUILayout.Label("All Characters:", EditorStyles.boldLabel);
             scrollPosition = GUILayout.BeginScrollView(scrollPosition);
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Add a new character", GUILayout.ExpandWidth(false)))
             {
                 CreateNewCharacter();
+                viewIndex = characters.allCharacters.Count;
             }
             GUILayout.Space(16);
             if (GUILayout.Button("Find & add a character", GUILayout.ExpandWidth(false)))
@@ -256,11 +260,47 @@ public class CharacterEditor : EditorWindow
                 {
                     GUILayout.Space(10);
                     characters.allCharacters[viewIndex - 1].characterName = EditorGUILayout.TextField("Character Name", characters.allCharacters[viewIndex - 1].characterName as string);
-                    characters.allCharacters[viewIndex - 1].spawnFloor = EditorGUILayout.IntSlider("Spawn Floor", characters.allCharacters[viewIndex - 1].spawnFloor, 0, 100);
-                    //characters.allCharacters[viewIndex - 1].currentFloor = EditorGUILayout.IntSlider("Current Floor", characters.allCharacters[viewIndex - 1].currentFloor, 0, 100);
+
+                    int spawnFloorField = EditorGUILayout.IntField("Spawn Floor", characters.allCharacters[viewIndex - 1].spawnFloor);
+                    characters.allCharacters[viewIndex - 1].spawnFloor = spawnFloorField > -1 ? spawnFloorField : 0;
+
+                    characters.allCharacters[viewIndex - 1].spawnPositionSetter = (CharacterEnums.SpawnPosition)EditorGUILayout.EnumPopup("Spawn Position Type", characters.allCharacters[viewIndex - 1].spawnPositionSetter);
+
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label("Original Spawn Point", GUILayout.ExpandWidth(false));
+                    GUILayout.Space(23);
+                    switch (characters.allCharacters[viewIndex - 1].spawnPositionSetter)
+                    {
+                        case CharacterEnums.SpawnPosition.RandomFromLevel:
+                            GUILayout.Label("Random spot on the map.");
+                            break;
+                        case CharacterEnums.SpawnPosition.FromVector:
+                            characters.allCharacters[viewIndex - 1].originalSpawnPosition = EditorGUILayout.Vector2Field("", characters.allCharacters[viewIndex - 1].originalSpawnPosition);
+                            if (GUILayout.Button("Position from chosen object", GUILayout.ExpandWidth(false)))
+                            {
+                                GameObject go = Selection.activeGameObject;
+                                if (go)
+                                {
+                                    characters.allCharacters[viewIndex - 1].originalSpawnPosition = go.transform.position;
+                                }
+                            }
+                            if (GUILayout.Button("Reset values", GUILayout.ExpandWidth(false)))
+                            {
+                                characters.allCharacters[viewIndex - 1].originalSpawnPosition = Vector2.zero;
+                            }
+                            break;
+                        //case CharacterEnums.SpawnPosition.FindFromLevel:
+                        //    GUILayout.Label("Finds spawnpoint object from the level, which has the \"Spawn Character\" set to this character.");
+                        //    break;
+                    }
+                    GUILayout.EndHorizontal();
+
                     characters.allCharacters[viewIndex - 1].authorization = EditorGUILayout.TextField("Authorization", characters.allCharacters[viewIndex - 1].authorization as string);
                     characters.allCharacters[viewIndex - 1].priority = EditorGUILayout.IntField("Priority", characters.allCharacters[viewIndex - 1].priority);
-                    characters.allCharacters[viewIndex - 1].infectionStageDuration = EditorGUILayout.IntField("Infection Stage Duration", characters.allCharacters[viewIndex - 1].infectionStageDuration);
+
+                    int infectionStageDurationField = EditorGUILayout.IntField("Infection Stage Duration", characters.allCharacters[viewIndex - 1].infectionStageDuration);
+                    characters.allCharacters[viewIndex - 1].infectionStageDuration = infectionStageDurationField > 0 ? infectionStageDurationField : 1;
+
                     characters.allCharacters[viewIndex - 1].animator = EditorGUILayout.ObjectField("Animator", characters.allCharacters[viewIndex - 1].animator, typeof(RuntimeAnimatorController), true) as RuntimeAnimatorController;
                     characters.allCharacters[viewIndex - 1].isOriginallyNPC = EditorGUILayout.Toggle("Is NPC At Start", characters.allCharacters[viewIndex - 1].isOriginallyNPC);
                     //characters.allCharacters[viewIndex - 1].isOriginallyInfected = EditorGUILayout.Toggle("Is Infected At Start", characters.allCharacters[viewIndex - 1].isOriginallyInfected);
@@ -268,8 +308,6 @@ public class CharacterEditor : EditorWindow
                     characters.allCharacters[viewIndex - 1].isInfectable = EditorGUILayout.Toggle("Is Infectable", characters.allCharacters[viewIndex - 1].isInfectable);
                     characters.allCharacters[viewIndex - 1].isInanimateObject = EditorGUILayout.Toggle("Is Inanimate Object", characters.allCharacters[viewIndex - 1].isInanimateObject);
                     characters.allCharacters[viewIndex - 1].gender = (CharacterEnums.Gender)EditorGUILayout.EnumPopup("Gender", characters.allCharacters[viewIndex - 1].gender);
-                    //characters.allCharacters[viewIndex - 1].currentStateOfInfection = (Character.InfectionState)EditorGUILayout.EnumPopup("State Of Infection", characters.allCharacters[viewIndex - 1].currentStateOfInfection);
-                    //characters.allCharacters[viewIndex - 1].currentStateOfSuspicion = (Character.SuspicionState)EditorGUILayout.EnumPopup("State Of Suspicion", characters.allCharacters[viewIndex - 1].currentStateOfSuspicion);
 
                     GUILayout.BeginHorizontal();
                     if (dialogues.Count > 0)
@@ -290,8 +328,8 @@ public class CharacterEditor : EditorWindow
 
                     }
                     GUILayout.EndHorizontal();
-
-                    characters.allCharacters[viewIndex - 1].characterPoseSprite = EditorGUILayout.ObjectField("Standing pose sprite", characters.allCharacters[viewIndex - 1].characterPoseSprite, typeof(Sprite), false, GUILayout.ExpandWidth(false)) as Sprite;
+                    
+                    characters.allCharacters[viewIndex - 1].characterFaceSprite = EditorGUILayout.ObjectField("Face sprite", characters.allCharacters[viewIndex - 1].characterFaceSprite, typeof(Sprite), false, GUILayout.ExpandWidth(false)) as Sprite;
                     characters.allCharacters[viewIndex - 1].characterDialogSprite = EditorGUILayout.ObjectField("Dialog sprite", characters.allCharacters[viewIndex - 1].characterDialogSprite, typeof(Sprite), false, GUILayout.ExpandWidth(false)) as Sprite;
 
                     GUILayout.Space(25);
@@ -367,7 +405,7 @@ public class CharacterEditor : EditorWindow
     {
         //if (characters.allCharacters.Any(c => c.characterName.Contains(charName)))
         {
-            int foundIndex = characters.allCharacters.FindIndex(c => c.characterName.Contains(nameToSeek)) + 1;
+            int foundIndex = characters.allCharacters.FindIndex(c => c.characterName.ToLower().Contains(nameToSeek.ToLower())) + 1;
             if (foundIndex > 0) viewIndex = foundIndex;
             else Debug.Log("No character found with \"" + nameToSeek + "\" in their name.");
         }

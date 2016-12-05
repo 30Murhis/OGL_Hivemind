@@ -78,7 +78,7 @@ public class DebugInput : MonoBehaviour {
                     targetChar.GetComponent<RayNPC>().enableSimpleAI = false;
             }
 
-            if (!targetChar.GetComponent<RayNPC>().enableSimpleAI)
+            if (targetChar.GetComponent<RayNPC>() && !targetChar.GetComponent<RayNPC>().enableSimpleAI)
             {
                 rm.CharacterInput = new Vector2(dir, 0);
                 rm.Run = Input.GetKey(keyRunWithTargetChar);
@@ -86,7 +86,7 @@ public class DebugInput : MonoBehaviour {
         }
         else
         {
-            targetChar = CharacterManager.instance.allCharacters[Random.Range(1, CharacterManager.instance.allCharacters.Count)].GetGameObject();
+            targetChar = CharacterManager.Instance.allCharacters[Random.Range(1, CharacterManager.Instance.allCharacters.Count)].GetGameObject();
             if (targetChar)
             {
                 rc = targetChar.GetComponent<RandomComment>();
@@ -114,7 +114,7 @@ public class DebugInput : MonoBehaviour {
 
         if (delta != 0 && allowCameraZoom)
         {
-            FindObjectOfType<CameraController>().ChangeZoomLevelInstant(-delta);
+            FindObjectOfType<CameraController>().ChangeZoomLevelToDirection(-delta);
         }
     }
 #endif

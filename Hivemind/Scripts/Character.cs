@@ -13,6 +13,12 @@ public class Character : ScriptableObject
     [Tooltip("Original spawn level of this character.")]
     public int spawnFloor = 0;
 
+    [Tooltip("Original spawn position setter. Used to change the way to assign spawn position to the character in the Character Editor.")]
+    public CharacterEnums.SpawnPosition spawnPositionSetter = CharacterEnums.SpawnPosition.RandomFromLevel;
+
+    [Tooltip("The original/default spawn position of the character in the level.")]
+    public Vector2 originalSpawnPosition = Vector2.zero;
+
     [Tooltip("Authorization state/access rights.")]
     public string authorization = "";
     
@@ -27,9 +33,6 @@ public class Character : ScriptableObject
 
     [Tooltip("Is this character a non-playable character at the start.")]
     public bool isOriginallyNPC = true;
-
-    //[Tooltip("Is this character infected at the start.")]
-    //public bool isOriginallyInfected = false;
 
     [Tooltip("Is this character interactable by player.")]
     public bool isInteractable = true;
@@ -49,11 +52,11 @@ public class Character : ScriptableObject
     [Tooltip("Index of the VIDE conversation for this character.")]
     public int VideConversationIndex = 0;
 
-    [Tooltip("General standing pose sprite of the character.")]
-    public Sprite characterPoseSprite = null;
-
     [Tooltip("Dialog sprite of the character.")]
     public Sprite characterDialogSprite = null;
+
+    [Tooltip("Face sprite of the character.")]
+    public Sprite characterFaceSprite = null;
 
     //public List<CommentList> comments = null; // or List<string>
 }
@@ -83,5 +86,15 @@ public class CharacterEnums
     public enum SuspicionState
     {
         None, Concern, Suspicion, Awareness, Fear, Panic, Alert, Intervention
+    }
+
+    /// <summary>
+    /// Spawn position setter used to change the way to assign spawn position to the character.
+    /// </summary>
+    public enum SpawnPosition
+    {
+        RandomFromLevel,
+        FromVector,
+        //FindFromLevel
     }
 }

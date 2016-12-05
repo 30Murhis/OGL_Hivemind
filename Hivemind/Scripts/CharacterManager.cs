@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
+using System;
 #if UNITY_5_3_OR_NEWER
 using UnityEngine.SceneManagement;
 #endif
@@ -13,24 +14,34 @@ using UnityEngine.SceneManagement;
 [System.Serializable]
 public class CharacterManager : MonoBehaviour {
 
-    public static CharacterManager instance = null;
+    public static CharacterManager Instance = null;
 
+    [Header("References")]
     [Tooltip("Characters asset that contains all characters.")]
     public Characters characterList;
     [Tooltip("Character prefab that is used as a blueprint for building and spawning all characters.")]
     public GameObject characterPrefab;
+
+    [Header("Variables")]
+    [Tooltip("Enable player input on currently controller character.")]
+    public bool enablePlayerInput = true;
     [Tooltip("Delay between each infection timer tick in seconds.")]
     public float infectionTick = 1f;
-    
+
+    [Header("Lists of characters")]
     [Tooltip("List of all character entities.")]
     public List<EntityData> allCharacters = new List<EntityData>();
+
+    [Space]
     [Tooltip("List of all character entities on the current level.")]
     public List<EntityData> charactersOnLevel = new List<EntityData>();
+
+    [Space]
     [Tooltip("List of all infected character entities.")]
     public List<EntityData> infectedCharacters = new List<EntityData>();
 
     // Character that is currently controlled by player
-    public GameObject currentCharacter = null;
+    GameObject currentCharacter = null;
 
     // Checks if allCharacters has been initialized
     bool initialized;
@@ -38,16 +49,20 @@ public class CharacterManager : MonoBehaviour {
     // Checks if first timer tick has passed
     bool firstTimerTickPassed;
 
+    // Action put to memory and ready to be called when needed
+    Action actionOnHold;
+
+    // Events
     public delegate void CurrentCharacterChange();
     public static event CurrentCharacterChange OnCharacterChange;
 
     public delegate void InfectionAdvance();
     public static event InfectionAdvance OnInfectionAdvance;
 
-    public delegate void NewInfectedCharacter(EntityData ed);
+    public delegate void NewInfectedCharacter(EntityData entityData);
     public static event NewInfectedCharacter OnNewInfectedCharacter;
 
-    public delegate void CharacterDeath(int i);
+    public delegate void CharacterDeath(EntityData entityData);
     public static event CharacterDeath OnCharacterDeath;
 
     /////////////////////////////
@@ -56,9 +71,9 @@ public class CharacterManager : MonoBehaviour {
 
     void Awake()
     {
-        if (instance == null)
+        if (Instance == null)
         {
-            instance = this;
+            Instance = this;
             DontDestroyOnLoad(gameObject);
             SceneManager.activeSceneChanged += LevelLoaded;
         }
@@ -66,46 +81,6 @@ public class CharacterManager : MonoBehaviour {
         {
             Destroy(gameObject);
         }
-    }
-
-    void LevelLoaded(Scene arg0, Scene arg1)
-    {
-        Reset();
-    }
-
-    //void OnEnable()
-    //{
-    //    Reset();
-    //}
-
-    //void OnLevelWasLoaded()
-    //{
-    //    Reset();
-    //}
-
-    /// <summary>
-    /// Initializes the characters, spawns them on the current level and sets the current player.
-    /// </summary>
-    void Reset()
-    {
-        if (instance != this) return;
-
-        // Initializes the list of characters.
-        if (!initialized)
-            InitializeCharacterList();
-
-        //infectedCharacters.Clear();
-
-        // Spawns all characters for this level
-#if UNITY_5_3_OR_NEWER
-        SpawnCharacters(SceneManager.GetActiveScene().buildIndex - 1);
-        Debug.Log("Level " + (SceneManager.GetActiveScene().buildIndex - 1) + " loaded, spawning " + charactersOnLevel.Count + " characters.");
-#else
-        SpawnCharacters(Application.loadedLevel - 1);
-#endif
-
-        // Sets the currently controlled player
-        SetCurrentCharacter();
     }
 
     void Start()
@@ -119,16 +94,52 @@ public class CharacterManager : MonoBehaviour {
     /// Private Methods ///
     ///////////////////////
 
+    void LevelLoaded(Scene arg0, Scene arg1)
+    {
+        Reset();
+    }
+
+    /// <summary>
+    /// Initializes the characters, spawns them on the current level and sets the current player.
+    /// </summary>
+    void Reset()
+    {
+        if (Instance != this) return;
+
+        // Initializes the list of characters.
+        if (!initialized)
+            InitializeCharacterList();
+
+        // Spawns all characters for this level
+#if UNITY_5_3_OR_NEWER
+        SpawnCharacters(SceneManager.GetActiveScene().buildIndex - 1);
+        Debug.Log("Level " + (SceneManager.GetActiveScene().buildIndex - 1) + " loaded, spawning " + charactersOnLevel.Count + " characters.");
+#else
+        SpawnCharacters(Application.loadedLevel - 1);
+#endif
+        
+        if (actionOnHold != null)
+        {
+            actionOnHold();
+            actionOnHold = null;
+        }
+        else
+        {
+            // Sets the currently controlled player
+            SetCurrentCharacter(GetCurrentCharacterEntityData());
+        }
+    }
+
+    /// <summary>
+    /// Creates an entity data class from every character scriptable object and adds it to the list of all characters.
+    /// </summary>
     void InitializeCharacterList()
     {
         allCharacters.Clear();
-        //foreach (Character c in characterList.allCharacters)
+
         for (int i = 0; i < characterList.allCharacters.Count; i++)
         {
             EntityData entityData = new EntityData(characterList.allCharacters[i]);
-            //entity.character = c;
-            //Debug.Log(entity.character.characterName + "'s current floor is " + entity.currentFloor);
-            //Debug.Log(entity.character.characterName + "'s current infection level is " + entity.currentStateOfInfection.ToString());
             allCharacters.Add(entityData);
         }
 
@@ -145,25 +156,28 @@ public class CharacterManager : MonoBehaviour {
         charactersOnLevel.Clear();
         for (int i = 0; i < allCharacters.Count; i++)
         {
-            EntityData ed = allCharacters[i];
+            EntityData entityData = allCharacters[i];
 
             //Debug.Log("Entity #" + i + ": " + ed.character.characterName);
 
-            if (ed.isAlive && ((ed.character.spawnFloor == level && ed.character.spawnFloor == ed.currentFloor) || ed.currentFloor == level))
+            if (entityData.isAlive && ((entityData.character.spawnFloor == level && entityData.character.spawnFloor == entityData.currentFloor) || entityData.currentFloor == level))
             {
-                if (ed.hasSpawned)
+                if (entityData.hasSpawned)
                 {
-                    ed.GetGameObject().SetActive(true);
+                    RespawnEntity(entityData);
                 }
                 else
                 {
-                    SpawnEntity(ed);
+                    SpawnEntity(entityData);
                 }
+
+                // Adds this entity to the list of characters on this level
+                charactersOnLevel.Add(entityData);
             }
             else
             {
-                if (ed != null && ed.GetGameObject() != null)
-                    ed.GetGameObject().SetActive(false);
+                if (entityData != null && entityData.GetGameObject() != null)
+                    DespawnEntity(entityData);
             }
         }
     }
@@ -195,19 +209,21 @@ public class CharacterManager : MonoBehaviour {
                 EntityData entityData = infectedCharacters[i];
                 entityData.currentInfectionStageDuration--;
 
+                // Checks if timer goes below 0
                 if (entityData.currentInfectionStageDuration < 0)
                 {
+                    // Checks if character is not on the last infection stage
                     if (entityData.currentStateOfInfection != CharacterEnums.InfectionStage.Final)
                     {
                         entityData.currentInfectionStageDuration = entityData.character.infectionStageDuration;
                         entityData.currentStateOfInfection++;
 
-                        if (entityData == currentCharacter.GetComponent<Entity>().entityData)
+                        if (entityData == GetCurrentCharacterEntityData()) // currentCharacter.GetComponent<Entity>().entityData
                             FindObjectOfType<DebugDisplay>().SetText(entityData.character.characterName + "'s infection is advancing...");
                     }
                     else
                     {
-                        if (entityData == currentCharacter.GetComponent<Entity>().entityData)
+                        if (entityData == GetCurrentCharacterEntityData())
                             FindObjectOfType<DebugDisplay>().SetText(entityData.character.characterName + "'s infection got the best of " + ((entityData.character.gender == CharacterEnums.Gender.Male) ? "him." : "her."));
 
                         KillCharacter(entityData);
@@ -215,6 +231,7 @@ public class CharacterManager : MonoBehaviour {
                 }
             }
 
+            // Calls for OnInfectionAdvance event
             if (OnInfectionAdvance != null)
             {
                 OnInfectionAdvance();
@@ -222,6 +239,169 @@ public class CharacterManager : MonoBehaviour {
 
             yield return new WaitForSeconds(infectionTick);
         }
+    }
+
+    /// <summary>
+    /// Spawns a character based on information from EntityData class.
+    /// </summary>
+    /// <param name="entityData">Entity's data, which is used to construct the entity with its information.</param>
+    /// <param name="position">Position to spawn the character to.</param>
+    /// <returns>Returns the whole character gameobject.</returns>
+    GameObject SpawnEntity(EntityData entityData, Vector3 position = default(Vector3))
+    {
+        // If character's infection is in its final stage and no time is left, does not spawn this character
+        if (entityData.currentStateOfInfection == CharacterEnums.InfectionStage.Final && entityData.currentInfectionStageDuration <= 0)
+        {
+            entityData.isAlive = false;
+            return null;
+        }
+
+        // Sets default spawn position
+        Vector2 spawnPosition = Vector2.zero;
+
+        // Changes position if it is set in parameters
+        if (position != default(Vector3))
+        {
+            spawnPosition = position;
+        }
+        else
+        {
+            // Changes position based on character's spawn point type
+            switch (entityData.character.spawnPositionSetter)
+            {
+                case CharacterEnums.SpawnPosition.FromVector:
+                    spawnPosition = entityData.character.originalSpawnPosition;
+                    break;
+                case CharacterEnums.SpawnPosition.RandomFromLevel:
+                    if (FindObjectOfType<BackgroundGenerator>())
+                    {
+                        float mapWidth = FindObjectOfType<BackgroundGenerator>().GetBackgroundWidth();
+                        spawnPosition.x = UnityEngine.Random.Range(-mapWidth / 2, mapWidth / 2);
+                    }
+                    else
+                    {
+                        Debug.LogWarning("BackgroundGenerator was not found on the scene. Character " + entityData.character.characterName + " was unable to spawn at random spot. It was spawned on the default spot instead.");
+                    }
+                    break;
+            }
+        }
+
+        // Tries to find a ground below from Ground layer
+        int groundMask = 1 << LayerMask.NameToLayer("Ground");
+        RaycastHit2D hit = Physics2D.Raycast(spawnPosition, Vector2.down, 50f, groundMask);
+
+        // If ground is found, moves spawn position's y value to be on top of the ground
+        if (hit)
+        {
+            spawnPosition.y = hit.collider.transform.position.y + hit.collider.bounds.size.y / 2;
+        }
+
+        // Creates the gameobject to the spawn position from prefab with character name
+        GameObject go = (GameObject)Instantiate(characterPrefab, spawnPosition, Quaternion.identity);
+        go.name = entityData.character.characterName;
+
+        // If conversation is set, gives it to the spawned character
+        if (entityData.character.VideConversation != null)
+        {
+            go.GetComponent<VIDE_Assign>().assignedDialogue = entityData.character.VideConversation;
+            go.GetComponent<VIDE_Assign>().assignedIndex = entityData.character.VideConversationIndex;
+            go.GetComponent<VIDE_Assign>().dialogueName = entityData.character.VideConversation.ToString();
+            go.GetComponent<VIDE_Assign>().dialogueName = entityData.character.VideConversation.ToString();
+        }
+
+        // If animator is set, gives it to the spawned character
+        if (entityData.character.animator != null)
+        {
+            go.GetComponentInChildren<Animator>().runtimeAnimatorController = entityData.character.animator;
+        }
+
+        // Gets components to memory for easy access
+        Entity e = go.GetComponent<Entity>();
+        RayNPC rnpc = go.GetComponent<RayNPC>();
+        //RayPlayerInput rpi = go.GetComponent<RayPlayerInput>();
+
+        // Checks if character is currently NPC and not infected
+        if (entityData.isNPC && !entityData.isInfected)
+        {
+            // Enables/sets NPC stuff and disables player stuff
+            go.tag = "NPC";
+            rnpc.enabled = true;
+            rnpc.SetAIBehaviourActive(true);
+            //rpi.enabled = false;
+        }
+        else
+        {
+            // Enables/sets player stuff and disables NPC stuff
+            go.tag = "Player";
+            rnpc.SetAIBehaviourActive(false);
+            rnpc.enabled = false;
+            //rpi.enabled = true;
+
+            // Adds this entity to the list of infected characters
+            infectedCharacters.Add(entityData);
+
+            // Sets infection state to 1 if it is at none
+            if (entityData.currentStateOfInfection == CharacterEnums.InfectionStage.None)
+            {
+                entityData.currentStateOfInfection = CharacterEnums.InfectionStage.Stage1;
+            }
+
+            // Launches the new infected character event
+            if (OnNewInfectedCharacter != null)
+            {
+                OnNewInfectedCharacter(entityData);
+            }
+
+            // Moves the camera to the position of the first infected character
+            if (infectedCharacters.Count == 1)
+            {
+                CameraController.Instance.transform.position = spawnPosition;
+            }
+        }
+
+        // Sets hasSpawned to true and sets entity and entity data to reference each other's
+        entityData.hasSpawned = true;
+        entityData.entity = e;
+        e.entityData = entityData;
+
+        //Debug.Log("Character " + entityData.character.characterName + " spawned to " + spawnPosition);
+
+        // Hides comment box
+        go.transform.GetComponentInChildren<RandomComment>().transform.parent.gameObject.SetActive(false);
+
+        return go;
+    }
+
+    /// <summary>
+    /// Respawns an entity and locates it to the given location or its previous location on the level.
+    /// </summary>
+    /// <param name="entityData"></param>
+    /// <param name="position"></param>
+    void RespawnEntity(EntityData entityData, Vector3 position = default(Vector3))
+    {
+        GameObject go = entityData.GetGameObject();
+        go.SetActive(true);
+
+        if (position != default(Vector3))
+        {
+            go.transform.position = position;
+        }
+        else
+        {
+            go.transform.position = entityData.lastPosition;
+        }
+
+        //Debug.Log("Character " + entityData.character.characterName + " respawned to " + go.transform.position);
+    }
+
+    /// <summary>
+    /// Despawns an entity saving its previous last position.
+    /// </summary>
+    /// <param name="entityData"></param>
+    void DespawnEntity(EntityData entityData)
+    {
+        entityData.lastPosition = entityData.GetGameObject().transform.position;
+        entityData.GetGameObject().SetActive(false);
     }
 
     //////////////////////
@@ -238,7 +418,7 @@ public class CharacterManager : MonoBehaviour {
     {
         try
         {
-            return instance.SpawnEntity(instance.allCharacters.Find(ed => ed.entity == entity), position);
+            return Instance.SpawnEntity(Instance.allCharacters.Find(ed => ed.entity == entity), position);
         }
         catch
         {
@@ -257,7 +437,7 @@ public class CharacterManager : MonoBehaviour {
     {
         try
         {
-            return instance.SpawnEntity(instance.allCharacters.Find(ed => ed.character = character), position);
+            return Instance.SpawnEntity(Instance.allCharacters.Find(ed => ed.character = character), position);
         }
         catch
         {
@@ -277,7 +457,7 @@ public class CharacterManager : MonoBehaviour {
     {
         try
         {
-            return instance.SpawnEntity(instance.allCharacters.Find(ed => ed.GetGameObject() == gameObject), position);
+            return Instance.SpawnEntity(Instance.allCharacters.Find(ed => ed.GetGameObject() == gameObject), position);
         }
         catch
         {
@@ -296,21 +476,22 @@ public class CharacterManager : MonoBehaviour {
         EntityData ed = character.GetComponent<Entity>().entityData;
         if (ed != null)
         {
-            instance.infectedCharacters.Add(ed);
+            Instance.infectedCharacters.Add(ed);
             ed.isInfected = true;
             ed.currentStateOfInfection = CharacterEnums.InfectionStage.Stage1;
             ed.isNPC = false;
 
             // If list of infected characters was empty, starts a new infection timer
-            if (instance.infectedCharacters.Count == 1)
+            if (Instance.infectedCharacters.Count == 1)
             {
-                instance.StartCoroutine(instance.InfectionTimer());
+                Instance.StartCoroutine(Instance.InfectionTimer());
             }
             
             //character.transform.parent = FindObjectOfType<AdvancedHivemind>().transform;
             character.tag = "Player";
-            character.GetComponent<RayNPC>().SetAIBehaviourActive(false);
+            //character.GetComponent<RayNPC>().SetAIBehaviourActive(false);
             character.GetComponent<RayNPC>().enabled = false;
+            Destroy(character.GetComponent<RayNPC>());
             character.GetComponent<RayPlayerInput>().enabled = false;
             //character.GetComponent<CharacterInteraction>().enabled = false;
             
@@ -366,53 +547,97 @@ public class CharacterManager : MonoBehaviour {
     /// </summary>
     public static void SetCurrentCharacter(EntityData entityData = null)
     {
-        // Disable the player controls from the possible previous character
-        if (instance.currentCharacter)
-            SetPlayerControl(instance.currentCharacter.GetComponent<Entity>().entityData, false);
-
-        instance.currentCharacter = null;
-
-        for (int i = 0; i < instance.infectedCharacters.Count; i++)
+        // If character to set is the same as the current character, return here
+        if (entityData != null && GetCurrentCharacterEntityData() == entityData)
         {
-            // If no entity is given, chooses the first infected character and gives it player control
-            if (entityData == null)
+            return;
+        }
+
+        // Disable the player controls from the possible previous character
+        if (Instance.currentCharacter)
+        {
+            SetPlayerControl(Instance.currentCharacter.GetComponent<Entity>().entityData, false);
+            Instance.currentCharacter = null;
+        }
+
+        EntityData entityDataOfNewCharacter = null;
+
+        // If entity is given, finds the entity from the list of infected characters.
+        // Otherwise gets the first one of the infected characters.
+        if (entityData != null)
+        {
+            entityDataOfNewCharacter = Instance.infectedCharacters.Find(x => x == entityData);
+        }
+        else
+        {
+            if (Instance.infectedCharacters.Count > 0)
+                entityDataOfNewCharacter = Instance.infectedCharacters[0];
+        }
+
+        // If entitydata of the new character has been retrieved successfully, sets current character to be the new entity
+        if (entityDataOfNewCharacter != null)
+        {
+            Instance.currentCharacter = entityDataOfNewCharacter.GetGameObject();
+            SetPlayerControl(entityDataOfNewCharacter, true);
+        }
+        else
+        {
+            //Debug.LogError("SetCurrentCharacter() failed; no available EntityData found.");
+        }
+        
+        if (OnCharacterChange != null)
+        {
+            OnCharacterChange();
+        }
+    }
+
+    /// <summary>
+    /// Changes currently controllable character, if there are others.
+    /// <para>If index is given, changes to the character that has the index of 'index % infectedCharacters.Count'.</para>
+    /// <para>If index is not given, changes to the character next on the list.</para>
+    /// <para>Changes levels if the next character is on a different level.</para>
+    /// </summary>
+    /// <param name="index">Index of entitydata to change to.</param>
+    public static void ChangeCurrentCharacter(int index = -1)
+    {
+        if (Instance.infectedCharacters.Count <= 1) return;
+
+        if (index > -1)
+        {
+            SetCurrentCharacter(Instance.infectedCharacters[index % Instance.infectedCharacters.Count]);
+        }
+        else
+        {
+            // Gets next index for infected characters from current character, and with the index, gets the entitydata of the next character
+            int newIndex = Instance.infectedCharacters.IndexOf(GetCurrentCharacterEntityData()) + 1;
+            if (newIndex >= Instance.infectedCharacters.Count) newIndex = 0;
+            EntityData entityData = Instance.infectedCharacters[newIndex];
+
+            // Checks if the next character is on another level than the current one
+            if (entityData.currentFloor != GetCurrentCharacterEntityData().currentFloor)
             {
-                instance.currentCharacter = instance.infectedCharacters[i].GetGameObject();
-                SetPlayerControl(instance.infectedCharacters[i], true);
-                break;
+                // If on another level, changes level and sets SetCurrentCharacter() to activate after level has loaded by storing it in action
+                Instance.actionOnHold = () =>
+                {
+                    SetCurrentCharacter(entityData);
+                };
+                SceneManager.LoadScene(entityData.currentFloor + 1);
             }
-            // If entity is given, finds the entity from the list of infected character and sets it as current character
-            if (instance.infectedCharacters[i] == entityData)
+            else
             {
-                instance.currentCharacter = instance.infectedCharacters[i].GetGameObject();
-                SetPlayerControl(instance.infectedCharacters[i], true);
-                break;
+                // If on the same level, just sets the character normally
+                SetCurrentCharacter(entityData);
             }
         }
     }
 
     /// <summary>
-    /// Changes currently controllable character.
-    /// <para>If index is given, changes to the character that has the index of 'index % infectedCharacters.Count'.</para>
-    /// <para>If index is not given, changes to the character next on the list.</para>
+    /// Gets currently controlled character's height, if it can be retrieved.
     /// </summary>
-    /// <param name="index"></param>
-    public static void ChangeCurrentCharacter(int index = -1)
+    /// <returns>Returns currently controlled character's height.</returns>
+    public static float GetCurrentCharacterHeight()
     {
-        if (instance.infectedCharacters.Count <= 0) return;
-
-        if (index > -1)
-        {
-            SetCurrentCharacter(instance.infectedCharacters[index % instance.infectedCharacters.Count]);
-        }
-        else
-        {
-            SetCurrentCharacter(instance.infectedCharacters[(instance.infectedCharacters.IndexOf(instance.currentCharacter.GetComponent<Entity>().entityData) + 1) == instance.infectedCharacters.Count ? 0 : (instance.infectedCharacters.IndexOf(instance.currentCharacter.GetComponent<Entity>().entityData) + 1)]);
-        }
-        if (OnCharacterChange != null)
-        {
-            OnCharacterChange();
-        }
+        return GetCurrentCharacterEntity().entityData.height;
     }
 
     /// <summary>
@@ -421,7 +646,7 @@ public class CharacterManager : MonoBehaviour {
     /// <returns>Returns currently controlled character.</returns>
     public static GameObject GetCurrentCharacterObject()
     {
-        return instance.currentCharacter;
+        return Instance.currentCharacter;
     }
 
     /// <summary>
@@ -430,13 +655,13 @@ public class CharacterManager : MonoBehaviour {
     /// <returns>Returns currently controlled character entity.</returns>
     public static Entity GetCurrentCharacterEntity()
     {
-        if (!instance.currentCharacter && !instance.currentCharacter.GetComponent<Entity>())
+        if (Instance.currentCharacter == null || Instance.currentCharacter.GetComponent<Entity>() == null)
         {
-            Debug.LogWarning("Could not retrieve entity.");
+            //Debug.LogWarning("Could not retrieve entity.");
             return null;
         }
 
-        return instance.currentCharacter.GetComponent<Entity>();
+        return Instance.currentCharacter.GetComponent<Entity>();
     }
 
     /// <summary>
@@ -445,13 +670,13 @@ public class CharacterManager : MonoBehaviour {
     /// <returns>Returns currently controlled character's entity data.</returns>
     public static EntityData GetCurrentCharacterEntityData()
     {
-        if (!instance.currentCharacter && !instance.currentCharacter.GetComponent<Entity>() && instance.currentCharacter.GetComponent<Entity>().entityData != null)
+        if (Instance.currentCharacter == null || Instance.currentCharacter.GetComponent<Entity>() == null || Instance.currentCharacter.GetComponent<Entity>().entityData == null)
         {
-            Debug.LogWarning("Could not retrieve entity data.");
+            //Debug.LogWarning("Could not retrieve entity data.");
             return null;
         }
 
-        return instance.currentCharacter.GetComponent<Entity>().entityData;
+        return Instance.currentCharacter.GetComponent<Entity>().entityData;
     }
 
     /// <summary>
@@ -460,9 +685,9 @@ public class CharacterManager : MonoBehaviour {
     /// <param name="number">Floor number to be set.</param>
     public static void SetCurrentFloorOfCurrentCharacter(int number)
     {
-        if (!instance.currentCharacter && !instance.currentCharacter.GetComponent<Entity>() && instance.currentCharacter.GetComponent<Entity>().entityData != null)
+        if (Instance.currentCharacter == null || Instance.currentCharacter.GetComponent<Entity>() == null || Instance.currentCharacter.GetComponent<Entity>().entityData == null)
         {
-            Debug.LogWarning("Could not set the current floor of current character.");
+            Debug.LogError("Could not set the current floor of current character.");
             return;
         }
 
@@ -475,123 +700,22 @@ public class CharacterManager : MonoBehaviour {
     /// <param name="entityData">Character to kill.</param>
     public static void KillCharacter(EntityData entityData)
     {
-        if (entityData != null && instance.charactersOnLevel.Contains(entityData))
+        Debug.Log("Character " + entityData.character.characterName + " has died.");
+        if (entityData != null && Instance.charactersOnLevel.Contains(entityData))
         {
             entityData.isAlive = false;
-            instance.charactersOnLevel.Remove(entityData);
-            if (instance.infectedCharacters.Contains(entityData))
+            Instance.charactersOnLevel.Remove(entityData);
+            if (Instance.infectedCharacters.Contains(entityData))
             {
                 if (OnCharacterDeath != null)
                 {
-                    OnCharacterDeath(instance.infectedCharacters.IndexOf(entityData));
+                    OnCharacterDeath(entityData);
                 }
-                instance.infectedCharacters.Remove(entityData);
+                Instance.infectedCharacters.Remove(entityData);
             }
             SetCurrentCharacter();
-            entityData.GetGameObject().SetActive(false);
-            
-            //if (instance.infectedCharacters.Count <= 0)
-            //    instance.StopCoroutine(instance.InfectionTimer());
+            Instance.DespawnEntity(entityData);
         }
-    }
-
-    /// <summary>
-    /// Spawns a character based on information from EntityData class.
-    /// </summary>
-    /// <param name="entityData">Entity's data, which is used to construct the entity with its information.</param>
-    /// <param name="position">Position to spawn the character to.</param>
-    /// <returns>Returns the whole character gameobject.</returns>
-    GameObject SpawnEntity(EntityData entityData, Vector3 position = default(Vector3))
-    {
-        // If character's infection is in its final stage and no time is left, does not spawn this character
-        if (entityData.currentStateOfInfection == CharacterEnums.InfectionStage.Final && entityData.currentInfectionStageDuration <= 0)
-        {
-            entityData.isAlive = false;
-            return null;
-        }
-
-        // Gets map's width and randomizes x position to be somewhere in the map
-        float mapWidth = FindObjectOfType<BackgroundGenerator>().GetBackgroundWidth();
-        float xPos = UnityEngine.Random.Range(-mapWidth / 2, mapWidth / 2);
-
-        // Initiates default spawn position with random x position and -5.8y, because floor is about -6y
-        Vector3 spawnPosition = new Vector3(xPos, -5.8f, 0f);
-
-        // Changes position if it is set in parameters
-        if (position != default(Vector3))
-        {
-            spawnPosition = position;
-        }
-
-        // Creates the gameobject from prefab with character name
-        GameObject go = (GameObject)Instantiate(characterPrefab, spawnPosition, Quaternion.identity);
-        go.name = entityData.character.characterName;
-
-        // If conversation is set, gives it to the spawned character
-        if (entityData.character.VideConversation != null)
-        {
-            go.GetComponent<VIDE_Assign>().assignedDialogue = entityData.character.VideConversation;
-            go.GetComponent<VIDE_Assign>().assignedIndex = entityData.character.VideConversationIndex;
-            go.GetComponent<VIDE_Assign>().dialogueName = entityData.character.VideConversation.ToString();
-            go.GetComponent<VIDE_Assign>().dialogueName = entityData.character.VideConversation.ToString();
-        }
-
-        // If animator is set, gives it to the spawned character
-        if (entityData.character.animator != null)
-        {
-            go.GetComponentInChildren<Animator>().runtimeAnimatorController = entityData.character.animator;
-        }
-
-        // Gets components to memory for easy access
-        Entity e = go.GetComponent<Entity>();
-        RayNPC rnpc = go.GetComponent<RayNPC>();
-        RayPlayerInput rpi = go.GetComponent<RayPlayerInput>();
-
-        // Checks if character is currently NPC and not infected
-        if (entityData.isNPC && !entityData.isInfected)
-        {
-            // Enables/sets NPC stuff and disables player stuff
-            go.tag = "NPC";
-            rnpc.enabled = true;
-            rnpc.SetAIBehaviourActive(true);
-            rpi.enabled = false;
-        }
-        else
-        {
-            // Enables/sets player stuff and disables NPC stuff
-            go.tag = "Player";
-            rnpc.SetAIBehaviourActive(false);
-            rnpc.enabled = false;
-            rpi.enabled = true;
-
-            // Adds this entity to the list of infected characters
-            infectedCharacters.Add(entityData);
-
-            // Sets infection state to 1 if it is at none
-            if (entityData.currentStateOfInfection == CharacterEnums.InfectionStage.None)
-            {
-                entityData.currentStateOfInfection = CharacterEnums.InfectionStage.Stage1;
-            }
-
-            // Launches the new infected character event
-            if (OnNewInfectedCharacter != null)
-            {
-                OnNewInfectedCharacter(entityData);
-            }
-        }
-        
-        // Sets hasSpawned to true and sets entity and entity data to reference each other's
-        entityData.hasSpawned = true;
-        entityData.entity = e;
-        e.entityData = entityData;
-
-        // Adds this entity to the list of characters on this level
-        charactersOnLevel.Add(entityData);
-
-        // Hides comment box
-        go.transform.GetComponentInChildren<RandomComment>().transform.parent.gameObject.SetActive(false);
-
-        return go;
     }
 
     /////////////////////////////////////
